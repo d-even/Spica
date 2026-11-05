@@ -1,0 +1,246 @@
+'use client';
+
+import { Check, ChevronRight, Loader2, ShieldAlert, ShieldCheck, ShieldQuestion } from 'lucide-react';
+import Link from 'next/link';
+import { useRef, useState, type FormEvent } from 'react';
+import type { AgentEvent, ServiceSummary } from '@/server/agent/session';
+import { NETWORKS, type NetworkId } from '@/lib/networks';
+import { api } from './api';
+import { Badge, Button, Card, ErrorNote, StatusBadge, Textarea } from './ui';
+
+const EXAMPLE = "Find today's cricket scores and give me the latest match updates. My total budget is $0.05.";
+
+interface Run {
+  prompt: string;
+  events: AgentEvent[];
+  running: boolean;
+}
+
+type Find<T extends AgentEvent['type']> = Extract<AgentEvent, { type: T }>;
+
+const last = <T extends AgentEvent['type']>(events: AgentEvent[], type: T) =>
+  [...events].reverse().find((event): event is Find<T> => event.type === type);
+
+function prettify(data: string) {
+  try {
+    return JSON.stringify(JSON.parse(data), null, 2);
+  } catch {
+    return data;
+  }
+}
+
+function Step({ event }: { event: AgentEvent }) {
+  const row = (icon: React.ReactNode, text: React.ReactNode) => (
+    <li className="rise flex gap-2 text-sm text-ink-2">
+      <span className="mt-0.5 shrink-0">{icon}</span>
+      <span className="min-w-0">{text}</span>
+    </li>
+  );
+  const done = <Check size={15} className="text-good" aria-hidden />;
+  switch (event.type) {
+    case 'status':
+      return row(<ChevronRight size={15} aria-hidden />, event.message);
+    case 'budget':
+      return row(done, `Task budget set to ${event.amount}`);
+    case 'discovered':
+      return row(done, `Found ${event.services.length} service${event.services.length === 1 ? '' : 's'}`);
+    case 'selected':
+      return row(<ChevronRight size={15} aria-hidden />, `Trying ${event.service.name} from ${event.service.provider}`);
+    case 'quote':
+      return row(done, `Provider quoted ${event.amount} on ${NETWORKS[event.network as NetworkId]?.label ?? event.network}`);
+    case 'identity':
+      return event.identity.status === 'none' ? null : row(done, `Identity: ${event.identity.detail}`);
+    case 'policy':
+      if (event.decision === 'allow') return row(<ShieldCheck size={15} className="text-good" aria-hidden />, `Spending Firewall approved: ${event.reason}`);
+      if (event.decision === 'deny') return row(<ShieldAlert size={15} className="text-bad" aria-hidden />, `Spending Firewall blocked: ${event.reason}`);
+      return row(<ShieldQuestion size={15} className="text-warn" aria-hidden />, event.reason);
+    case 'payment':
+      return row(<ChevronRight size={15} aria-hidden />, { signing: 'Authorizing payment', submitted: 'Sending payment proof', verifying: 'Verifying payment independently' }[event.status]);
+    default:
+      return null;
+  }
+}
+
+function Services({ services }: { services: ServiceSummary[] }) {
+  return (
+    <ul className="divide-y divide-line">
+      {services.slice(0, 6).map((service) => (
+        <li key={service.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+          <span className="min-w-0">
+            <span className="block truncate font-medium">{service.name}</span>
+            <span className="block truncate text-xs text-ink-3">{service.provider}</span>
+          </span>
+          <span className="shrink-0 tabular-nums text-ink-2">{service.price ?? 'Unpriced'}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean; onFinished?: () => void }) {
+  const [input, setInput] = useState('');
+  const [run, setRun] = useState<Run>();
+  const [error, setError] = useState<string>();
+  const form = useRef<HTMLFormElement>(null);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const message = input.trim();
+    if (!message || run?.running) return;
+    setError(undefined);
+    setRun({ prompt: message, events: [], running: true });
+    setInput('');
+
+    try {
+      const response = await fetch('/api/agent/run', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ message }),
+      });
+      if (!response.ok || !response.body) {
+        await api('/api/agent/run', { method: 'POST', body: JSON.stringify({ message }) }).catch((cause: Error) => setError(cause.message));
+        setRun((current) => current && { ...current, running: false });
+        return;
+      }
+      const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += value;
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        const events = lines.filter(Boolean).map((line) => JSON.parse(line) as AgentEvent);
+        setRun((current) => current && { ...current, events: [...current.events, ...events] });
+      }
+    } catch {
+      setError('The connection to the agent was lost.');
+    }
+    setRun((current) => current && { ...current, running: false });
+    onFinished?.();
+  }
+
+  const events = run?.events ?? [];
+  const answer = last(events, 'answer');
+  const data = last(events, 'data');
+  const receipt = last(events, 'receipt');
+  const failure = last(events, 'error');
+  const discovered = last(events, 'discovered');
+  const approval = last(events, 'approval_required');
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <form ref={form} onSubmit={submit} className="space-y-3">
+          <Textarea
+            rows={3}
+            aria-label="Ask the agent"
+            placeholder="Ask for something. Mention a budget if you like."
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                form.current?.requestSubmit();
+              }
+            }}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <button type="button" onClick={() => setInput(EXAMPLE)} className="text-left text-xs text-ink-3 underline underline-offset-2">
+              Try the cricket example
+            </button>
+            <Button type="submit" disabled={run?.running || !input.trim()}>
+              {run?.running && <Loader2 size={15} className="animate-spin" aria-hidden />}
+              {run?.running ? 'Working' : 'Send'}
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      {error && <ErrorNote>{error}</ErrorNote>}
+
+      {run && (
+        <div className={detailed ? 'grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_300px]' : 'space-y-4'}>
+          <div className="min-w-0 space-y-4">
+            <Card title={run.prompt.length > 70 ? `${run.prompt.slice(0, 70)}…` : run.prompt}>
+              <ul className="space-y-2" aria-live="polite">
+                {events.map((event, index) => (
+                  <Step key={index} event={event} />
+                ))}
+                {run.running && (
+                  <li className="flex items-center gap-2 text-sm text-ink-3">
+                    <Loader2 size={15} className="animate-spin" aria-hidden /> Working
+                  </li>
+                )}
+              </ul>
+            </Card>
+
+            {failure && <ErrorNote>{failure.message}</ErrorNote>}
+
+            {approval && (
+              <Card title="Needs your approval" className="rise">
+                <p className="text-sm text-ink-2">
+                  {approval.amount} for {approval.service}. {approval.reason}
+                </p>
+                <Link href="/dashboard" className="mt-2 inline-block text-sm font-medium text-accent">
+                  Review on your dashboard
+                </Link>
+              </Card>
+            )}
+
+            {answer && (
+              <Card
+                title="Answer"
+                className="rise"
+                action={answer.source === 'demo' ? <Badge tone="warn">Demo planner</Badge> : <Badge tone="info">Claude</Badge>}
+              >
+                <p className="whitespace-pre-wrap text-sm leading-relaxed">{answer.text}</p>
+                {data && (
+                  <details className="mt-3" open={answer.source === 'demo'}>
+                    <summary className="cursor-pointer text-xs text-ink-3">Data from {data.service}</summary>
+                    <pre className="mt-2 max-h-72 max-w-full overflow-auto rounded-xl bg-surface-2 p-3 font-mono text-xs">{prettify(data.data)}</pre>
+                  </details>
+                )}
+              </Card>
+            )}
+          </div>
+
+          {detailed && (
+            <div className="min-w-0 space-y-4">
+              {discovered && (
+                <Card title="Discovered services">
+                  {discovered.services.length ? <Services services={discovered.services} /> : <p className="text-sm text-ink-3">No matches.</p>}
+                  {discovered.failures.length > 0 && <p className="mt-2 text-xs text-warn">Part of the catalog could not be reached.</p>}
+                </Card>
+              )}
+              {last(events, 'selected') && (
+                <Card title="Selected provider">
+                  <p className="text-sm font-medium">{last(events, 'selected')!.service.provider}</p>
+                  <p className="text-xs text-ink-3">Estimated cost {last(events, 'quote')?.amount ?? last(events, 'selected')!.service.price ?? 'unknown'}</p>
+                </Card>
+              )}
+              {receipt && (
+                <Card title="Payment" className="rise">
+                  <div className="flex items-center justify-between">
+                    <span className="text-lg font-semibold tabular-nums">{receipt.transaction.amount}</span>
+                    <StatusBadge status={receipt.transaction.status} />
+                  </div>
+                  <p className="mt-1 text-xs text-ink-3">{receipt.transaction.detail}</p>
+                  <Link href={`/transactions/${receipt.transaction.id}`} className="mt-2 inline-block text-sm font-medium text-accent">
+                    View receipt
+                  </Link>
+                </Card>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {!detailed && receipt && (
+        <Link href={`/transactions/${receipt.transaction.id}`} className="block text-sm font-medium text-accent">
+          View receipt for {receipt.transaction.amount}
+        </Link>
+      )}
+    </div>
+  );
+}

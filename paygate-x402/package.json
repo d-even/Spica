@@ -1,0 +1,14 @@
+{
+  "name": "paygate-x402",
+  "version": "2.0.0",
+  "description": "Framework-neutral x402 v2 middleware with pluggable network adapters",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": { "build": "tsc -p tsconfig.json" },
+  "keywords": ["x402", "payments", "USDC", "middleware"],
+  "license": "MIT",
+  "peerDependencies": { "@x402/core": "^2.30.0" },
+  "devDependencies": { "typescript": "^5.0.0" }
+}
