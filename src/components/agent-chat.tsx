@@ -10,13 +10,18 @@ import { CodeBlock } from './code-block';
 import { LivePayment } from './payment-proof';
 import { Badge, Button, Card, ErrorNote, Textarea } from './ui';
 
-const EXAMPLE = 'I want a live cricket scores API. My budget is $0.05, pay on Arc.';
-
 interface Run {
   prompt: string;
   events: AgentEvent[];
   running: boolean;
 }
+
+const EXAMPLES = [
+  'I want a weather API for Pune.',
+  'I want a news API about technology.',
+  'I want a stock quotes API for IBM.',
+  'I want a live cricket scores API.',
+];
 
 type Find<T extends AgentEvent['type']> = Extract<AgentEvent, { type: T }>;
 
@@ -83,9 +88,8 @@ export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean
   const [error, setError] = useState<string>();
   const form = useRef<HTMLFormElement>(null);
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    const message = input.trim();
+  async function send(text: string) {
+    const message = text.trim();
     if (!message || run?.running) return;
     setError(undefined);
     setRun({ prompt: message, events: [], running: true });
@@ -120,6 +124,11 @@ export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean
     onFinished?.();
   }
 
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    send(input);
+  }
+
   const events = run?.events ?? [];
   const answer = last(events, 'answer');
   const data = last(events, 'data');
@@ -135,7 +144,7 @@ export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean
           <Textarea
             rows={3}
             aria-label="Ask the agent"
-            placeholder="What kind of API do you want, and what will you pay? For example: a weather API, budget $0.05, pay on Hedera."
+            placeholder="What kind of API do you want?"
             value={input}
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={(event) => {
@@ -146,9 +155,19 @@ export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean
             }}
           />
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <button type="button" onClick={() => setInput(EXAMPLE)} className="text-left text-xs text-ink-3 underline underline-offset-2">
-              Try an example
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {EXAMPLES.map((example) => (
+                <button
+                  key={example}
+                  type="button"
+                  disabled={run?.running}
+                  onClick={() => send(example)}
+                  className="min-h-9 rounded-full border border-line px-3 text-left text-xs text-ink-2 hover:bg-surface-2 disabled:opacity-50"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
             <Button type="submit" disabled={run?.running || !input.trim()}>
               {run?.running && <Loader2 size={15} className="animate-spin" aria-hidden />}
               {run?.running ? 'Working' : 'Send'}
