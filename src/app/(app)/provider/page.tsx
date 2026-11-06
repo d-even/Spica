@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useCallback, useState, type FormEvent } from 'react';
 import { api, useApi, type ReputationDto } from '@/components/api';
 import { BarChart, lastSevenDays } from '@/components/bar-chart';
+import { ConnectWallet } from '@/components/connect-wallet';
 import { Button, Card, Empty, ErrorNote, Field, Input, Loading, PageHeader, Stat, Textarea } from '@/components/ui';
 import { formatUsd } from '@/lib/money';
 import { NETWORKS, SELECTABLE_NETWORKS, type NetworkId } from '@/lib/networks';
@@ -10,7 +11,6 @@ import { NETWORKS, SELECTABLE_NETWORKS, type NetworkId } from '@/lib/networks';
 interface ProviderDto {
   id: string;
   name: string;
-  ensName: string | null;
   walletAddress: string;
   hederaAccount: string | null;
 }
@@ -34,21 +34,22 @@ interface SaleDto {
 
 interface ProviderView {
   provider: ProviderDto | null;
-  paygateId?: string | null;
   services: ServiceDto[];
   sales: SaleDto[];
 }
 
-function ProfileForm({ provider, paygateId, onSaved }: { provider: ProviderDto | null; paygateId?: string | null; onSaved: () => void }) {
+function ProfileForm({ provider, onSaved }: { provider: ProviderDto | null; onSaved: () => void }) {
   const [form, setForm] = useState({
     name: provider?.name ?? '',
     walletAddress: provider?.walletAddress ?? '',
-    ensName: provider?.ensName ?? '',
     hederaAccount: provider?.hederaAccount ?? '',
-    paygateLabel: '',
   });
   const [error, setError] = useState<string>();
   const [saved, setSaved] = useState(false);
+  const setWallet = useCallback((walletAddress: string) => {
+    setForm((current) => ({ ...current, walletAddress }));
+    setSaved(false);
+  }, []);
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -74,20 +75,15 @@ function ProfileForm({ provider, paygateId, onSaved }: { provider: ProviderDto |
     <Card title="Provider profile">
       <form onSubmit={save} className="grid gap-4 sm:grid-cols-2">
         <Field label="Name"><Input required {...field('name')} /></Field>
-        <Field label="Wallet address"><Input required placeholder="0x…" {...field('walletAddress')} /></Field>
-        <Field label="ENS name" hint="Proves this wallet is yours. It says nothing about your API's quality.">
-          <Input placeholder="sports.yourname.eth" {...field('ensName')} />
-        </Field>
-        <Field label="Hedera account" hint="Needed to accept payments on Hedera.">
+        <div className="space-y-2 text-sm">
+          <span className="block font-medium">Wallet for Arc payments</span>
+          <ConnectWallet address={form.walletAddress} onChange={setWallet} />
+          <Input required aria-label="Wallet address" placeholder="or paste a 0x address" {...field('walletAddress')} />
+          <span className="block text-xs text-ink-3">USDC from agents on Arc is paid to this address.</span>
+        </div>
+        <Field label="Hedera account" hint="Optional. Needed to accept payments on Hedera.">
           <Input placeholder="0.0.1234" {...field('hederaAccount')} />
         </Field>
-        {paygateId ? (
-          <p className="text-sm text-ink-2 sm:col-span-2">PayGate ID: <span className="font-mono">{paygateId}</span></p>
-        ) : (
-          <Field label="PayGate ID" hint="Optional. Claims yourname.paygate.eth for this wallet.">
-            <Input placeholder="yourname" {...field('paygateLabel')} />
-          </Field>
-        )}
         <div className="flex items-center gap-3 sm:col-span-2">
           <Button type="submit">Save profile</Button>
           {saved && <span role="status" className="text-sm text-good">Saved</span>}
@@ -203,7 +199,7 @@ export default function Provider() {
             <BarChart data={lastSevenDays(paid, (sale) => sale.createdAt, (sale) => BigInt(sale.eventData.amountMicros ?? 0))} format={(value) => `$${value.toFixed(2)}`} />
           </Card>
         )}
-        <ProfileForm key={provider?.id ?? 'new'} provider={provider} paygateId={data.paygateId} onSaved={reload} />
+        <ProfileForm key={provider?.id ?? 'new'} provider={provider} onSaved={reload} />
         {provider && <ServiceForm onCreated={reload} />}
         {provider && (
           <Card title="Your APIs">

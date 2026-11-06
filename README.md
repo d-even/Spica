@@ -17,48 +17,13 @@ Open http://localhost:3000/agent and choose **Try the cricket example**.
 
 With no configuration, PayGate runs in **demo mode**: no keys, no money, data in memory. It runs the real HTTP 402 handshake and the real firewall with a simulated payment rail. Everything it produces is labelled **Simulated**, and discovery still uses the live marketplace.
 
-## Project status
-
-Last checked on 2026-11-06. PayGate runs in live mode on testnet. A real Arc payment has settled onchain. A real Hedera payment has not happened yet.
-
-| Area | Status |
-| --- | --- |
-| App, agent, firewall and approvals | Working in live mode with Supabase |
-| Unit tests | 88 of 88 passing, and `tsc` is clean |
-| Arc payments | Working. Gemini bought a service through Circle Gateway, and the payment settled onchain |
-| Hedera payments | Accounts are set up and signing works. Blocked on testnet USDC: the agent account holds 0 |
-| HCS audit | Publishing. Only verified or settling payments are published so far, and the topic has no submit key |
-| Circle discovery | Live |
-
-Not built yet:
-
-- Weekly and per-merchant limits, and pause or revoke controls for an agent
-- Multiple agents and agent identity
-- The other five agent tools, and provider comparison
-- Audit events for rejections, mirror-node verification and an audit dashboard
-- Provider and agent SDKs
-- Landing page rewrite and the remaining API routes
-
-ENS and the Sepolia subdomain code are still in the app, and are due to move to `/legacy`.
-
-## Steps so far
-
-1. Built the spending firewall, the Arc and Hedera adapters, and the `paygate-x402` seller middleware.
-2. Replaced OTP sign-in with wallet sign-in.
-3. Moved the agent to Gemini, with fallback between models.
-4. Added the service role grants migration.
-5. Created a testnet account and an HCS topic with `create-topic.js`.
-6. Inspected the repository and checked the facilitators, the Circle catalog and the Arc and Hedera testnets.
-
-Next is Phase 1, a real Hedera x402 payment, once the setup steps below are done.
-
 ## What it does
 
-- **AI agent:** Gemini plans each request through three tools, with a labelled fixed planner when no key is set.
+- **AI agent:** Claude plans each request through three tools, with a labelled fixed planner when no key is set.
 - **Spending Firewall:** per-request, daily, monthly and per-task limits, provider allowlist and blocklist, network permissions, an approval threshold, and an automatic-payment switch.
 - **Discovery:** the live Circle Agent Marketplace, plus services registered on PayGate.
 - **Payments:** Arc USDC through Circle Gateway nanopayments, and Hedera USDC through an x402 facilitator, behind one adapter interface.
-- **Provider identity:** ENS names are checked against the payment address. A mismatch blocks payment.
+- **Provider wallets:** providers connect a browser wallet (or paste an address) to receive Arc payments, and add a Hedera account ID for Hedera payments. No name service is required.
 - **Reputation:** measured from real calls only. Below five calls it says "Not enough data".
 - **Receipts and audit:** every payment gets a receipt, with optional Hedera Consensus Service publishing.
 - **Provider dashboard:** register an API, set a price, and see revenue, failures and reputation.
@@ -67,14 +32,13 @@ Next is Phase 1, a real Hedera x402 payment, once the setup steps below are done
 
 ```mermaid
 flowchart TD
-    U[Person] --> A[Agent: Gemini or demo planner]
+    U[Person] --> A[Agent: Claude or demo planner]
     A -->|discover, inspect| C[Catalog]
     C --> CM[Circle Agent Marketplace]
     C --> PG[PayGate services]
     A -->|purchase by service ID only| P[Purchase orchestrator]
     P -->|unpaid request| S[Seller]
     S -->|402 and terms| P
-    P --> E[ENS identity check]
     P --> F[Policy engine]
     F -->|needs approval| H[Person approves]
     F -->|allowed| R[Atomic reservation]
@@ -95,7 +59,7 @@ flowchart TD
 | `src/server/signer/` | The only code that reads buyer keys, and the only path to a signature |
 | `src/server/payments/` | `PaymentAdapter` with Arc, Hedera and demo implementations |
 | `src/server/purchase.ts` | The buyer flow from quote to receipt |
-| `src/server/agent/` | Gemini tool loop, demo planner and budget parsing |
+| `src/server/agent/` | Claude tool loop, demo planner and budget parsing |
 | `src/server/discovery/` | Circle catalog client and PayGate services |
 
 ## Payment flow
@@ -118,9 +82,9 @@ Receipt statuses are **Verified** (settled and confirmed), **Settling** (accepte
 ## Going live on testnet
 
 1. Copy `.env.example` to `.env.local`.
-2. Create a Supabase project. Review the files in `supabase/migrations/` against any existing tables, then apply them in filename order.
-3. Set `PAYGATE_SESSION_SECRET` to a random value of at least 32 characters. People sign in with an Ethereum browser wallet (EOA), using Sign-In with Ethereum.
-4. Add `GEMINI_API_KEY`.
+2. Create a Supabase project. Review `supabase/migrations/20261105000000_spending_firewall.sql` against any existing tables, then apply it.
+3. In Supabase Auth, edit the magic link email template to include `{{ .Token }}`, since sign-in uses a typed code.
+4. Add `ANTHROPIC_API_KEY`.
 5. Create a new EOA wallet for the agent and set `AGENT_PRIVATE_KEY`. Set `PAYGATE_SELLER_ADDRESS` to a different wallet.
 6. Get Arc testnet USDC from https://faucet.circle.com, then move it into Gateway:
 
@@ -132,39 +96,7 @@ Receipt statuses are **Verified** (settled and confirmed), **Settling** (accepte
 7. Add `CRICAPI_KEY` from https://cricketdata.org.
 8. Set `PAYGATE_MODE=live` and restart.
 
-## Hedera testnet setup
-
-1. Create two testnet accounts at https://portal.hedera.com, one for the agent and one for the seller. They must be different, because a payment to yourself proves nothing.
-2. Associate both accounts with testnet USDC, `0.0.429274`, using a Hedera wallet. The repo has no script for this yet.
-3. Get testnet USDC for the agent account from https://faucet.circle.com.
-4. Set these values in `.env.local`:
-
-   | Variable | Value |
-   | --- | --- |
-   | `HEDERA_AGENT_ACCOUNT_ID`, `HEDERA_AGENT_PRIVATE_KEY` | The agent account |
-   | `HEDERA_SELLER_ACCOUNT_ID` | The seller account |
-   | `HEDERA_FACILITATOR_URL` | A facilitator from the table below |
-   | `HEDERA_OPERATOR_ID`, `HEDERA_OPERATOR_KEY` | The account that pays for HCS messages. ECDSA keys only for `create-topic.js` |
-
-5. Create the audit topic, then set `HEDERA_HCS_TOPIC_ID` to the ID it prints:
-
-   ```bash
-   node create-topic.js
-   ```
-
-6. Set `PAYGATE_MODE=live` and restart.
-
-All three facilitators listed `hedera:testnet` on 2026-11-06. Settlement through them has not been tested. PayGate reads the fee payer from `/supported` at runtime, so these values are for reference only:
-
-| Facilitator | Fee payer |
-| --- | --- |
-| `https://api.testnet.blocky402.com` | `0.0.7162784` |
-| `https://x402.org/facilitator` | `0.0.9185802` |
-| `https://testnet.facilitator.launa.dev` | `0.0.9839454` |
-
-## Circle catalog on testnet
-
-Of 2,745 unique listings, 134 accept Arc Testnet, all through Gateway. Of those, 132 are on `x402.quicknode.com`, which has not been tested. The other 2 are BotPay endpoints, and both returned a live Gateway 402. None look like research services, so most listings can be browsed but not paid on testnet.
+For Hedera, also set the `HEDERA_*` values. The agent and seller accounts must both be associated with the USDC token.
 
 ## Network configuration
 
@@ -195,7 +127,7 @@ All routes except `/api/x402/*` and `/api/auth/*` need a signed-in session. Iden
 | `POST /api/provider/services` | Register an API |
 | `DELETE /api/provider/services/:id` | Remove your API |
 | `GET /api/x402/:serviceId` | A paid resource, using x402 v2 |
-| `POST /api/auth/challenge`, `/verify`, `/logout` | Wallet sign-in |
+| `POST /api/auth/otp`, `/verify`, `/logout` | Sign-in |
 
 ## Using the middleware
 
@@ -216,7 +148,7 @@ Write a `SellerAdapter` to add a network. The middleware only knows the protocol
 | --- | --- |
 | `npm test` | Policy engine, reservations, approvals, middleware, reputation, URL guard |
 | `npm run test:e2e -- <url>` | The full journey against a running server in demo mode |
-| `npm run test:live` | Real Arc, Gateway, ENS and Hedera, with throwaway unfunded keys. It cannot spend |
+| `npm run test:live` | Real Arc, Gateway and Hedera, with throwaway unfunded keys. It cannot spend |
 | `npm run test:mutation` | Breaks 20 protections one at a time and confirms the tests notice |
 
 ## Security
@@ -236,6 +168,8 @@ Write a `SellerAdapter` to add a network. The middleware only knows the protocol
 - The signer is a module boundary, not a separate process. For production, move it to its own service or a KMS.
 - Rate limiting is per server instance. Budgets do not depend on it.
 - Unverified payments stay counted, and there is no reconciliation screen yet.
-- ENS shows identity only. It says nothing about the quality of an API.
 - Reputation is computed from calls made through this PayGate deployment.
 - Provider revenue counts sales reported by PayGate's seller route.
+#   P a y G a t e 
+ 
+ 

@@ -6,8 +6,6 @@ import { CHAIN_CONFIGS, BatchEvmScheme } from '@circle-fin/x402-batching/client'
 import { BatchFacilitatorClient } from '@circle-fin/x402-batching/server';
 import { createPublicClient, http, erc20Abi } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { mainnet } from 'viem/chains';
-import { normalize } from 'viem/ens';
 
 const results: boolean[] = [];
 
@@ -28,7 +26,6 @@ const expect = (condition: boolean, message: string) => {
 const ARC_NETWORK = 'eip155:5042002';
 const GATEWAY_URL = 'https://gateway-api-testnet.circle.com';
 const arc = createPublicClient({ transport: http('https://rpc.testnet.arc.io') });
-const ethereum = createPublicClient({ chain: mainnet, transport: http(process.env.ENS_RPC_URL) });
 const gateway = new BatchFacilitatorClient({ url: GATEWAY_URL });
 
 await check('Arc testnet RPC reports chain 5042002', async () => {
@@ -92,24 +89,6 @@ await check('Circle Gateway refuses a tampered signature', async () => {
   const result = await gateway.verify(tampered as never, requirement as never);
   expect(!result.isValid, 'a tampered payment was accepted');
   return String(result.invalidReason);
-});
-
-await check('ENS forward resolution', async () => {
-  const address = await ethereum.getEnsAddress({ name: normalize('vitalik.eth') });
-  expect(Boolean(address), 'no address');
-  return String(address);
-});
-
-await check('ENS reverse resolution', async () => {
-  const name = await ethereum.getEnsName({ address: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045' });
-  expect(name === 'vitalik.eth', String(name));
-  return String(name);
-});
-
-await check('ENS returns nothing for an unregistered name', async () => {
-  const address = await ethereum.getEnsAddress({ name: normalize('paygate-unregistered-name-check.eth') });
-  expect(address === null, String(address));
-  return 'null';
 });
 
 await check('Hedera facilitator supports hedera:testnet', async () => {

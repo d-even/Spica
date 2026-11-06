@@ -14,13 +14,11 @@ export default function Receipt({ params }: { params: Promise<{ id: string }> })
   if (!tx) return <Loading />;
 
   const network = NETWORKS[tx.network];
-  // While settling, the reference is a Gateway ID, which no block explorer knows.
-  const explorer = tx.reference && tx.status !== 'simulated' && tx.status !== 'settling' ? network.explorerTx?.(tx.reference) : undefined;
+  const explorer = tx.reference && tx.status !== 'simulated' ? network.explorerTx?.(tx.reference) : undefined;
   const rows: [string, React.ReactNode][] = [
     ['Transaction ID', <span key="id" className="font-mono text-xs">{tx.id}</span>],
     ['Agent', <span key="agent" className="font-mono text-xs">{tx.agentId}</span>],
     ['Provider', tx.providerName],
-    ['Provider ENS', tx.providerEns ?? 'None'],
     ['API', tx.serviceName],
     ['Amount', `${formatUsd(tx.amountMicros)} ${tx.token}`],
     ['Network', network.label],

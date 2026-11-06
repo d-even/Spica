@@ -93,7 +93,7 @@ describe('policy decisions', () => {
     expect(code(evaluate(request('0.05', { listedAmountMicros: usdToMicros('0.02') })))).toBe('price_changed');
   });
 
-  it('refuses a provider whose ENS name points elsewhere', () => {
+  it('refuses a provider whose verified identity points elsewhere', () => {
     expect(code(evaluate(request('0.02', { identityStatus: 'mismatch' })))).toBe('identity_mismatch');
   });
 

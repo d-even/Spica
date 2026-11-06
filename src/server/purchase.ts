@@ -9,7 +9,6 @@ import type { CatalogService } from '@/server/discovery/types';
 import { activeNetworks, mainnetEnabled } from '@/server/env';
 import { evaluatePolicy, type PolicyDecision } from '@/server/firewall/policy';
 import { assertPublicUrl, safeFetch } from '@/server/http/guard';
-import { checkProviderIdentity, type ProviderIdentity } from '@/server/identity/ens';
 import { getAdapter } from '@/server/payments/registry';
 import type { Confirmation } from '@/server/payments/types';
 import { requirementHash, signPayment } from '@/server/signer';
@@ -27,7 +26,6 @@ export interface PurchaseContext {
 
 export type PurchaseEvent =
   | { type: 'quote'; service: string; amount: string; network: string }
-  | { type: 'identity'; identity: ProviderIdentity }
   | { type: 'policy'; decision: PolicyDecision['outcome']; reason: string }
   | { type: 'payment'; status: 'signing' | 'submitted' | 'verifying' }
   | { type: 'receipt'; transaction: ReceiptSummary };
@@ -64,10 +62,6 @@ export function parsePaymentRequired(headers: Headers, body: string): PaymentReq
     return null;
   }
 }
-
-/** Networks this deployment can pay on and the person allows. Demo is never a policy choice. */
-export const payableNetworks = (active: NetworkId[], allowed: NetworkId[]) =>
-  active.filter((network) => network === 'demo' || allowed.includes(network));
 
 /** Cheapest offer this deployment can pay. Network filtering happens before the firewall sees it. */
 export function selectRequirement(paymentRequired: PaymentRequired, networks: NetworkId[]) {
@@ -128,24 +122,17 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
     await observe({ reachable: true, succeeded: false, paid: false });
     return { outcome: 'failed', reason: 'The service sent payment terms PayGate could not read.' };
   }
-  const policy = await store.getPolicy(userId);
-  const selected = selectRequirement(paymentRequired, payableNetworks(activeNetworks(), policy.allowedNetworks));
+  const selected = selectRequirement(paymentRequired, activeNetworks());
   if (!selected) {
     await observe({ reachable: true, succeeded: false, paid: false });
-    return { outcome: 'denied', code: 'network_not_allowed', reason: 'The service does not accept any network allowed here.' };
+    return { outcome: 'denied', code: 'network_not_allowed', reason: 'The service does not accept any network enabled here.' };
   }
   const { requirement, network } = selected;
   const amountMicros = BigInt(requirement.amount);
   const hash = requirementHash(requirement, resource);
   emit({ type: 'quote', service: service.name, amount: formatUsd(amountMicros), network });
 
-  // 2. Identity, then firewall. The model has no say in either.
-  const identity =
-    network === 'demo' || networkByCaip2(requirement.network)?.family !== 'arc'
-      ? ({ status: 'none', ensName: null, resolvedAddress: null, detail: 'ENS applies to EVM addresses.' } as ProviderIdentity)
-      : await checkProviderIdentity(service.providerEns, requirement.payTo);
-  emit({ type: 'identity', identity });
-
+  // 2. Firewall. The model has no say in it.
   const humanApproved = approval !== undefined && approval.status === 'approved' && approval.requirementHash === hash;
   const listed = service.offers.find((offer) => offer.network === network)?.amountMicros;
   const paymentRequest = {
@@ -155,8 +142,8 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
     providerKey: service.providerKey,
     listedAmountMicros: listed === undefined ? undefined : BigInt(listed),
     taskBudgetMicros: context.taskBudgetMicros,
-    identityStatus: identity.status,
   };
+  const policy = await store.getPolicy(userId);
   const decision = evaluatePolicy(policy, paymentRequest, await store.getSpendState(userId, taskId), {
     mainnetEnabled: mainnetEnabled(),
     humanApproved,
@@ -226,7 +213,7 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
       taskId,
       providerKey: service.providerKey,
       providerName: service.providerName,
-      providerEns: identity.status === 'match' ? identity.ensName : null,
+      providerEns: null,
       serviceId: service.id,
       serviceName: service.name,
       resource,

@@ -9,18 +9,26 @@ export const mode = (): Mode => (process.env.PAYGATE_MODE === 'live' ? 'live' : 
 /** Mainnet moves real money, so it takes an explicit server-side opt-in. */
 export const mainnetEnabled = () => process.env.PAYGATE_ENABLE_MAINNET === 'true';
 
+/**
+ * Which model plans agent runs. AGENT_PROVIDER picks one explicitly; otherwise
+ * whichever key is set is used (Gemini first, then Claude), else the demo planner.
+ */
+export function agentProvider(): 'gemini' | 'claude' | 'demo' {
+  const wanted = process.env.AGENT_PROVIDER?.toLowerCase();
+  if (wanted === 'gemini' && process.env.GEMINI_API_KEY) return 'gemini';
+  if (wanted === 'claude' && process.env.ANTHROPIC_API_KEY) return 'claude';
+  if (process.env.GEMINI_API_KEY) return 'gemini';
+  if (process.env.ANTHROPIC_API_KEY) return 'claude';
+  return 'demo';
+}
+
 export const publicUrl = () => (process.env.PAYGATE_PUBLIC_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 
 export const supabaseConfig = () => {
   const url = process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  return url && serviceRoleKey ? { url, serviceRoleKey } : null;
-};
-
-/** Signs session cookies. Anyone holding it can act as any wallet, so short values are refused. */
-export const sessionSecret = () => {
-  const secret = process.env.PAYGATE_SESSION_SECRET;
-  return secret && secret.length >= 32 ? secret : null;
+  const anonKey = process.env.SUPABASE_ANON_KEY;
+  return url && serviceRoleKey && anonKey ? { url, serviceRoleKey, anonKey } : null;
 };
 
 export interface Integration {
@@ -47,16 +55,14 @@ export function integrations(): Integration[] {
       configured: true,
       missing: [],
     },
-    check('llm', 'Gemini', 'Understands requests and plans the agent run.', ['GEMINI_API_KEY']),
-    check('supabase', 'Supabase', 'Durable data.', ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']),
     {
-      id: 'sign-in',
-      label: 'Wallet sign-in',
-      purpose: 'Signs session cookies. Needs at least 32 characters.',
-      configured: sessionSecret() !== null,
-      missing: sessionSecret() ? [] : ['PAYGATE_SESSION_SECRET'],
-      optional: true,
+      id: 'llm',
+      label: agentProvider() === 'claude' ? 'Claude' : 'Gemini',
+      purpose: 'Understands requests and plans the agent run. Set GEMINI_API_KEY or ANTHROPIC_API_KEY.',
+      configured: agentProvider() !== 'demo',
+      missing: agentProvider() === 'demo' ? ['GEMINI_API_KEY'] : [],
     },
+    check('supabase', 'Supabase', 'Durable data and sign-in.', ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY']),
     check('arc', 'Arc payments', 'USDC nanopayments through Circle Gateway.', ['AGENT_PRIVATE_KEY']),
     check('seller', 'Arc seller', 'Receives payments for the built-in cricket services.', ['PAYGATE_SELLER_ADDRESS'], true),
     check(
