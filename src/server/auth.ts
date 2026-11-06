@@ -18,6 +18,13 @@ export const authClient = () => {
   return createClient(config.url, config.anonKey, { auth: { persistSession: false, autoRefreshToken: false } });
 };
 
+/** Service-role auth admin. Server only: used to create sign-in codes without Supabase sending email. */
+export const adminAuthClient = () => {
+  const config = supabaseConfig();
+  if (!config) throw new Error('Supabase is not configured.');
+  return createClient(config.url, config.serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } }).auth.admin;
+};
+
 /**
  * The identity of every request comes from here, never from the request body.
  * With Supabase configured a real session is required. Without it, demo mode

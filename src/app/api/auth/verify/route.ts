@@ -5,7 +5,7 @@ import { supabaseConfig } from '@/server/env';
 import { apiError } from '@/server/http/api';
 import { allowRequest } from '@/server/http/rate-limit';
 
-const body = z.object({ email: z.string().email(), token: z.string().trim().min(6).max(10) });
+const body = z.object({ email: z.string().trim().toLowerCase().email(), token: z.string().trim().min(6).max(10) });
 
 export async function POST(request: Request) {
   if (!supabaseConfig()) return apiError('Sign-in is not configured.', 503);

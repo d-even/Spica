@@ -38,12 +38,15 @@ PayGate moves money on behalf of an AI agent, so it assumes the model can be man
 | `SUPABASE_SERVICE_ROLE_KEY` | Database access | `store/supabase.ts` |
 | `HEDERA_OPERATOR_KEY` | HCS publishing | `audit/hcs.ts` |
 | `ADMIN_PRIVATE_KEY` | Creating PayGate IDs on Sepolia | `lib/subdomain.ts` |
+| `RESEND_API_KEY` | Sending sign-in codes | `server/email.ts` |
 
 Use a new, dedicated wallet for the agent, holding only what you are willing to lose. Keep `ADMIN_PRIVATE_KEY` separate from it.
 
 ## Sessions
 
 - Sign-in is an emailed code through Supabase Auth. The access token is stored in an httpOnly, `SameSite=Lax` cookie named `paygate_session`.
+- With Resend configured, Supabase creates the code with the service-role key and PayGate emails it, so Supabase's email limits no longer protect the sign-in form. PayGate limits code requests to 5 per email and 20 per IP every 10 minutes, per server instance. If you run several instances, add a shared limiter or bot protection in front of `/api/auth/otp`.
+- The code is never logged or returned to the browser.
 - Without Supabase, demo mode uses one shared demo user. Live mode refuses to run without Supabase.
 - Approvals can only be decided by their owner, while pending, before they expire.
 

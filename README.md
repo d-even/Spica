@@ -86,7 +86,9 @@ Receipt statuses are **Verified** (settled and confirmed), **Settling** (accepte
 
 1. Copy `.env.example` to `.env.local`.
 2. Create a Supabase project. Review `supabase/migrations/20261105000000_spending_firewall.sql` against any existing tables, then apply it.
-3. In Supabase Auth, edit the magic link email template to include `{{ .Token }}`, since sign-in uses a typed code.
+3. Choose how sign-in codes are emailed:
+   - **Resend (recommended):** set `RESEND_API_KEY` and `EMAIL_FROM` (an address on a domain verified in Resend). PayGate sends the code itself, and Supabase's email rate limit does not apply.
+   - **Supabase's built-in email:** edit the magic link email template in Supabase Auth to include `{{ .Token }}`, since sign-in uses a typed code. It allows only a few emails an hour.
 4. Add `ANTHROPIC_API_KEY`.
 5. Create a new EOA wallet for the agent and set `AGENT_PRIVATE_KEY`. Set `PAYGATE_SELLER_ADDRESS` to a different wallet.
 6. Get Arc testnet USDC from https://faucet.circle.com, then move it into Gateway:

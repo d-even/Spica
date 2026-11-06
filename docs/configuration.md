@@ -31,6 +31,15 @@ The `/settings` page shows the mode and which integrations are configured. It li
 
 All three must be set for Supabase to be used. When they are, sign-in is required even in demo mode.
 
+### Sign-in email (optional)
+
+| Variable | Effect |
+| --- | --- |
+| `RESEND_API_KEY` | Sends sign-in codes through Resend's API instead of Supabase's built-in email |
+| `EMAIL_FROM` | Sender, on a domain verified in Resend, for example `PayGate <login@yourdomain.com>` |
+
+Both must be set. Supabase still creates and checks the codes (`auth.admin.generateLink`, which sends no email), so Supabase's email rate limit no longer applies. PayGate's own limits do: 5 codes per email and 20 per IP address every 10 minutes, counted per server instance. Without these variables, Supabase sends the email, and its built-in sender allows only a few emails an hour.
+
 ### Arc
 
 | Variable | Effect |
@@ -118,4 +127,4 @@ These are constants in code, not settings.
 | Agent runs | 10 / min / user | `api/agent/run` |
 | Signed-in routes | 120 / min / user / route | `http/api.ts` |
 | Seller route | 120 / min / IP | `api/x402/[serviceId]` |
-| Email codes | 5 sends, 10 checks, per 10 min per email | `api/auth/*` |
+| Email codes | 5 sends and 10 checks per email, 20 sends per IP, per 10 min | `api/auth/*` |

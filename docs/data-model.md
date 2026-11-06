@@ -108,4 +108,4 @@ RLS is on for every table, with **no policies**. The browser never talks to thes
 
 ### Applying it
 
-Review the migration against any existing tables first, then apply it with the Supabase CLI or SQL editor. Also edit the Supabase magic link email template to include `{{ .Token }}`, because sign-in uses a typed code.
+Review the migration against any existing tables first, then apply it with the Supabase CLI or SQL editor. If Supabase sends the sign-in emails, also edit its magic link email template to include `{{ .Token }}`, because sign-in uses a typed code. With Resend configured, PayGate sends its own email and the template is not used. See [Configuration](configuration.md#sign-in-email-optional).

@@ -44,6 +44,7 @@ export function integrations(): Integration[] {
     },
     check('llm', 'Claude', 'Understands requests and plans the agent run.', ['ANTHROPIC_API_KEY']),
     check('supabase', 'Supabase', 'Durable data and sign-in.', ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY']),
+    check('email', 'Resend', 'Sends sign-in codes. Without it, Supabase sends them.', ['RESEND_API_KEY', 'EMAIL_FROM'], true),
     check('arc', 'Arc payments', 'USDC nanopayments through Circle Gateway.', ['AGENT_PRIVATE_KEY']),
     check('seller', 'Arc seller', 'Receives payments for the built-in cricket services.', ['PAYGATE_SELLER_ADDRESS'], true),
     check(
