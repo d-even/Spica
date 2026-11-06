@@ -6,15 +6,13 @@
  *   Hedera CAIP-2 IDs and USDC token IDs: docs.hedera.com/solutions/ai/x402 and
  *   the DEFAULT_ASSETS table shipped in @x402/hedera.
  */
-export type NetworkId = 'arc-testnet' | 'arc-mainnet' | 'hedera-testnet' | 'hedera-mainnet' | 'demo';
+export type NetworkId = 'arc-testnet' | 'hedera-testnet' | 'demo';
 
 export interface NetworkInfo {
   id: NetworkId;
   label: string;
   caip2: string;
   family: 'arc' | 'hedera' | 'demo';
-  /** Real money moves on this network. */
-  mainnet: boolean;
   tokenSymbol: 'USDC';
   tokenAsset: string;
   tokenDecimals: 6;
@@ -24,8 +22,8 @@ export interface NetworkInfo {
 const USDC_ARC = '0x3600000000000000000000000000000000000000';
 
 /** HashScan opens `0.0.1-2-3`. Hedera SDKs print the same ID as `0.0.1@2.3`. */
-export const hashscanTransaction = (id: string, mainnet = false) =>
-  `https://hashscan.io/${mainnet ? 'mainnet' : 'testnet'}/transaction/${id.replace('@', '-').replace(/\.(\d+)$/, '-$1')}`;
+export const hashscanTransaction = (id: string) =>
+  `https://hashscan.io/testnet/transaction/${id.replace('@', '-').replace(/\.(\d+)$/, '-$1')}`;
 
 export const NETWORKS: Record<NetworkId, NetworkInfo> = {
   'arc-testnet': {
@@ -33,58 +31,33 @@ export const NETWORKS: Record<NetworkId, NetworkInfo> = {
     label: 'Arc Testnet',
     caip2: 'eip155:5042002',
     family: 'arc',
-    mainnet: false,
     tokenSymbol: 'USDC',
     tokenAsset: USDC_ARC,
     tokenDecimals: 6,
     explorerTx: (hash) => `https://explorer.testnet.arc.io/tx/${hash}`,
-  },
-  'arc-mainnet': {
-    id: 'arc-mainnet',
-    label: 'Arc',
-    caip2: 'eip155:5042',
-    family: 'arc',
-    mainnet: true,
-    tokenSymbol: 'USDC',
-    tokenAsset: USDC_ARC,
-    tokenDecimals: 6,
-    explorerTx: (hash) => `https://explorer.arc.io/tx/${hash}`,
   },
   'hedera-testnet': {
     id: 'hedera-testnet',
     label: 'Hedera testnet',
     caip2: 'hedera:testnet',
     family: 'hedera',
-    mainnet: false,
     tokenSymbol: 'USDC',
     tokenAsset: '0.0.429274',
     tokenDecimals: 6,
     explorerTx: (id) => hashscanTransaction(id),
-  },
-  'hedera-mainnet': {
-    id: 'hedera-mainnet',
-    label: 'Hedera mainnet',
-    caip2: 'hedera:mainnet',
-    family: 'hedera',
-    mainnet: true,
-    tokenSymbol: 'USDC',
-    tokenAsset: '0.0.456858',
-    tokenDecimals: 6,
-    explorerTx: (id) => hashscanTransaction(id, true),
   },
   demo: {
     id: 'demo',
     label: 'Demo (simulated)',
     caip2: 'paygate:demo',
     family: 'demo',
-    mainnet: false,
     tokenSymbol: 'USDC',
     tokenAsset: 'DEMO-USDC',
     tokenDecimals: 6,
   },
 };
 
-export const SELECTABLE_NETWORKS: NetworkId[] = ['arc-testnet', 'hedera-testnet', 'arc-mainnet', 'hedera-mainnet'];
+export const SELECTABLE_NETWORKS: NetworkId[] = ['arc-testnet', 'hedera-testnet'];
 
 export function networkByCaip2(caip2: string): NetworkInfo | undefined {
   return Object.values(NETWORKS).find((network) => network.caip2 === caip2);

@@ -32,7 +32,6 @@ Rules run in this order and the first one that fails decides. Every rule except 
 | --- | --- | --- |
 | 1 | Amount is above zero | `invalid_amount` |
 | 2 | Asset is the USDC token of that network | `unsupported_asset` |
-| 3 | Mainnet only if the server set `PAYGATE_ENABLE_MAINNET=true` | `mainnet_disabled` |
 | 4 | Network is in `allowedNetworks` (the demo network is exempt) | `network_not_allowed` |
 | 5 | Provider is not blocked | `provider_blocked` |
 | 6 | Provider is on the allowlist, if the allowlist has entries | `provider_not_allowlisted` |

@@ -2,7 +2,7 @@
 
 A spending firewall and payment layer for AI agents. You ask for something in plain language. The agent finds a paid API, your spending rules decide whether it can pay, and you get the result with a receipt.
 
-> Arc helps AI agents discover services. PayGate ensures agents can purchase those services safely, transparently and within the user's budget.
+> Arc helps AI agents discover services. SPICA ensures agents can purchase those services safely, transparently and within the user's budget.
 
 The limits are enforced on the server, outside the AI. The model has no tool that accepts an amount, a recipient or an approval.
 
@@ -13,24 +13,25 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000/agent and choose **Try the cricket example**.
+Open http://localhost:3000/provider and add an API. It then appears in the marketplace, and the agent page offers it as a one-click example.
 
-With no configuration, PayGate runs in **demo mode**: no keys, no money, data in memory. It runs the real HTTP 402 handshake and the real firewall with a simulated payment rail. Everything it produces is labelled **Simulated**, and discovery still uses the live marketplace.
+With no configuration, SPICA runs in **demo mode**: no keys, no money, data in memory. It runs the real HTTP 402 handshake and the real firewall with a simulated payment rail. Everything it produces is labelled **Simulated**, and discovery still uses the live marketplace.
 
 For how it works inside, see the [documentation](docs/README.md).
 
 ## Project status
 
-Last checked on 2026-11-06. PayGate runs in live mode on testnet. A real Arc payment has settled onchain. A real Hedera payment has not happened yet.
+Last checked on 2026-11-07. SPICA runs in live mode on testnet only. A real Arc payment has settled onchain. A real Hedera payment has not happened yet.
 
 | Area | Status |
 | --- | --- |
 | App, agent, firewall and approvals | Working in live mode with Supabase |
-| Unit tests | 132 of 132 passing, and `tsc` is clean |
+| Unit tests | 165 of 165 passing, and `tsc` is clean |
+| Agent SDK | Built in [`packages/agent-sdk`](packages/agent-sdk), with its own tests. Not published to npm. |
 | Arc payments | Working. Gemini bought a service through Circle Gateway, and the payment settled onchain |
-| Hedera payments | Accounts are set up and signing works. Blocked on testnet USDC: the agent account holds 0 |
+| Hedera payments | Accounts are set up and signing works. All 3 attempts failed, and the agent account holds 0 testnet USDC |
 | HCS audit | Publishing. Only verified or settling payments are published so far, and the topic has no submit key |
-| Circle discovery | Live |
+| Circle discovery | Off. Set `PAYGATE_CIRCLE_CATALOG=true` to list the Circle catalog as well |
 
 Not built yet:
 
@@ -38,7 +39,7 @@ Not built yet:
 - Multiple agents and agent identity
 - The other five agent tools, and provider comparison
 - Audit events for rejections, mirror-node verification and an audit dashboard
-- Provider and agent SDKs
+- Provider SDK
 - The remaining API routes
 
 ## Steps so far
@@ -56,12 +57,11 @@ Next is Phase 1, a real Hedera x402 payment, once the setup steps below are done
 
 - **AI agent:** Claude plans each request through three tools, with a labelled fixed planner when no key is set.
 - **Spending Firewall:** per-request, daily, monthly and per-task limits, provider allowlist and blocklist, network permissions, an approval threshold, and an automatic-payment switch.
-- **Discovery:** the live Circle Agent Marketplace, plus services registered on PayGate.
+- **Discovery:** the marketplace holds only APIs that providers list on SPICA. It starts empty.
 - **Payments:** Arc USDC through Circle Gateway nanopayments, and Hedera USDC through an x402 facilitator, behind one adapter interface.
 - **Provider wallets:** providers connect a browser wallet (or paste an address) to receive Arc payments, and add a Hedera account ID for Hedera payments. No name service is required.
 - **Reputation:** measured from real calls only. Below five calls it says "Not enough data".
 - **Receipts and audit:** every payment gets a receipt, with optional Hedera Consensus Service publishing.
-- **Built-in APIs:** weather, news, stock quotes and cricket, resold per call. Their upstream keys stay on the server, and a buyer gets a PayGate key.
 - **Provider dashboard:** register an API, set a price, and see revenue, failures and reputation.
 
 ## Architecture
@@ -71,7 +71,7 @@ flowchart TD
     U[Person] --> A[Agent: Claude or demo planner]
     A -->|discover, inspect| C[Catalog]
     C --> CM[Circle Agent Marketplace]
-    C --> PG[PayGate services]
+    C --> PG[SPICA services]
     A -->|purchase by service ID only| P[Purchase orchestrator]
     P -->|unpaid request| S[Seller]
     S -->|402 and terms| P
@@ -96,19 +96,19 @@ flowchart TD
 | `src/server/payments/` | `PaymentAdapter` with Arc, Hedera and demo implementations |
 | `src/server/purchase.ts` | The buyer flow from quote to receipt |
 | `src/server/agent/` | Claude tool loop, demo planner and budget parsing |
-| `src/server/discovery/` | Circle catalog client and PayGate services |
+| `src/server/discovery/` | Circle catalog client and SPICA services |
 
 ## Payment flow
 
 1. The agent names a service it discovered in this run. It cannot supply a URL, price or recipient.
-2. PayGate requests the resource unpaid and reads the seller's real `402` terms.
+2. SPICA requests the resource unpaid and reads the seller's real `402` terms.
 3. It chooses the cheapest offer on a network that is enabled and allowed.
 4. The policy engine decides: allow, needs approval, or deny.
 5. An atomic reservation re-checks budgets and duplicates. This stops concurrent requests overspending.
 6. The signer moves that reservation from held to signing exactly once, for that exact requirement, and signs.
-7. PayGate retries with `PAYMENT-SIGNATURE`.
+7. SPICA retries with `PAYMENT-SIGNATURE`.
 8. The seller verifies, runs the handler, settles, and only then releases data.
-9. PayGate confirms the payment itself instead of trusting the seller: through Circle Gateway, the Arc receipt, or the Hedera mirror node.
+9. SPICA confirms the payment itself instead of trusting the seller: through Circle Gateway, the Arc receipt, or the Hedera mirror node.
 10. The ledger and receipt are written.
 
 A held amount is only released when no money can have moved. If the outcome is unknown, for example the seller vanished after receiving the proof, the amount stays counted until someone reviews it.
@@ -129,7 +129,6 @@ Receipt statuses are **Verified** (settled and confirmed), **Settling** (accepte
    npm run wallet:deposit -- 1
    ```
 
-7. Add `CRICAPI_KEY` from https://cricketdata.org.
 8. Set `PAYGATE_MODE=live` and restart.
 
 For Hedera, also set the `HEDERA_*` values. The agent and seller accounts must both be associated with the USDC token.
@@ -140,8 +139,6 @@ For Hedera, also set the `HEDERA_*` values. The agent and seller accounts must b
 | --- | --- | --- | --- | --- |
 | Arc Testnet | `eip155:5042002` | USDC `0x3600…0000` | Circle Gateway | Default |
 | Hedera testnet | `hedera:testnet` | USDC `0.0.429274` | x402 facilitator | Default |
-| Arc | `eip155:5042` | USDC `0x3600…0000` | Circle Gateway | Off unless `PAYGATE_ENABLE_MAINNET=true` |
-| Hedera mainnet | `hedera:mainnet` | USDC `0.0.456858` | x402 facilitator | Off unless `PAYGATE_ENABLE_MAINNET=true` |
 
 Arc and Hedera share nothing: each adapter has its own token, proof format and verification.
 
@@ -165,8 +162,9 @@ All routes except `/api/x402/*`, `/api/v1/*` and `/api/auth/*` need a signed-in 
 | `GET /api/x402/:serviceId` | A paid resource, using x402 v2 |
 | `GET /api/v1/:serviceId` | The developer API. Send the key from a purchase as `Authorization: Bearer <key>`. Each call pays through the firewall, and query parameters reach the provider |
 | `POST /api/auth/nonce`, `/wallet`, `/logout` | Wallet sign-in (Sign-In with Ethereum on Arc Testnet) |
+| `GET /api/auth/me` | The signed-in wallet, or null |
 
-## Integrating PayGate
+## Integrating SPICA
 
 There are four ways in, depending on which side of the payment you are on.
 
@@ -174,14 +172,14 @@ There are four ways in, depending on which side of the payment you are on.
 | --- | --- | --- |
 | Charge for an API you already run, without changing it | [Provider dashboard](#1-sell-an-existing-api-through-paygate-no-code) | None |
 | Charge for routes inside your own server | [`paygate-x402` middleware](#2-add-payments-to-your-own-server) | A few lines plus an adapter |
-| Let your app or agent buy data within spending limits | [PayGate HTTP API](#3-buy-through-paygate-from-your-app-or-agent) | An HTTP client |
-| Pay a PayGate-hosted API from your own x402 client | [`/api/x402/:serviceId`](#4-pay-paygate-services-from-any-x402-client) | An x402 v2 client |
+| Let your app or agent buy data within spending limits | [SPICA HTTP API](#3-buy-through-spica-from-your-app-or-agent) | An HTTP client |
+| Pay a SPICA-hosted API from your own x402 client | [`/api/x402/:serviceId`](#4-pay-paygate-services-from-any-x402-client) | An x402 v2 client |
 
 You can also [reuse the policy engine](#reusing-the-firewall-in-your-own-agent) on its own.
 
-### 1. Sell an existing API through PayGate (no code)
+### 1. Sell an existing API through SPICA (no code)
 
-PayGate hosts the paywall and proxies paid requests to your API.
+SPICA hosts the paywall and proxies paid requests to your API.
 
 1. Sign in with your wallet and open `/provider`.
 2. Fill in your provider profile:
@@ -189,7 +187,7 @@ PayGate hosts the paywall and proxies paid requests to your API.
    - **Hedera account** (optional): needed if you accept Hedera, in the form `0.0.1234`.
 3. Register a service with a name, description, public endpoint URL, price in USD (for example `0.02`) and the networks you accept.
 
-Your API is then served at `GET /api/x402/<serviceId>` and appears in the marketplace and in agent discovery. For each call PayGate:
+Your API is then served at `GET /api/x402/<serviceId>` and appears in the marketplace and in agent discovery. For each call SPICA:
 
 1. Returns `402` with your price and wallet.
 2. Verifies the buyer's payment.
@@ -198,7 +196,7 @@ Your API is then served at `GET /api/x402/<serviceId>` and appears in the market
 
 If your API fails, nobody is charged. Sales, failures and measured reputation show on the provider dashboard.
 
-The same steps work over HTTP. Authenticate as described in [section 3](#3-buy-through-paygate-from-your-app-or-agent), then:
+The same steps work over HTTP. Authenticate as described in [section 3](#3-buy-through-spica-from-your-app-or-agent), then:
 
 ```bash
 curl -X PUT  "$PAYGATE/api/provider" -b cookies.txt -H 'content-type: application/json' \
@@ -211,8 +209,8 @@ curl -X POST "$PAYGATE/api/provider/services" -b cookies.txt -H 'content-type: a
 
 Requirements for your endpoint:
 
-- It must be a public `https` URL that answers `GET` with JSON. PayGate refuses private and internal addresses.
-- If your API needs a key, add it when you register the service, as a bearer token, a header or a query parameter. PayGate stores it encrypted (`PAYGATE_ENCRYPTION_KEY`) and sends it only on paid calls. Without a key, anyone who learns your URL can call it for free.
+- It must be a public `https` URL that answers `GET` with JSON. SPICA refuses private and internal addresses.
+- If your API needs a key, add it when you register the service, as a bearer token, a header or a query parameter. SPICA stores it encrypted (`PAYGATE_ENCRYPTION_KEY`) and sends it only on paid calls. Without a key, anyone who learns your URL can call it for free.
 - Query parameters sent by buyers are passed through to your endpoint.
 
 ### 2. Add payments to your own server
@@ -239,11 +237,11 @@ You supply:
 
 Install and build steps, a working Arc adapter, a production replay guard and a Hono example are in [`paygate-x402/README.md`](paygate-x402/README.md). This repo's adapters are full references: [`arc.ts`](src/server/payments/arc.ts) and [`hedera.ts`](src/server/payments/hedera.ts).
 
-Any x402 v2 buyer can pay you, including PayGate's agent, if your API is in the marketplace.
+Any x402 v2 buyer can pay you, including SPICA's agent, if your API is in the marketplace.
 
-### 3. Buy through PayGate from your app or agent
+### 3. Buy through SPICA from your app or agent
 
-Run PayGate (demo or live) and drive it over HTTP. Your app sends a plain-language request, and PayGate discovers, pays within your policy and returns the answer. Your app never holds the agent's payment key.
+Run SPICA (demo or live) and drive it over HTTP. Your app sends a plain-language request, and SPICA discovers, pays within your policy and returns the answer. Your app never holds the agent's payment key.
 
 **Sign in.** In demo mode, signing in is optional: without it, everyone shares one demo user. In live mode, sign in with a wallet using [Sign-In with Ethereum](https://eips.ethereum.org/EIPS/eip-4361) on Arc Testnet. The wallet only proves who you are. Payments come from the server's agent wallet. Sign-in sets an httpOnly `paygate_session` cookie, valid for 7 days, which you send with later calls:
 
@@ -290,7 +288,7 @@ curl -X PUT "$PAYGATE/api/policy" -b cookies.txt -H 'content-type: application/j
 const res = await fetch(`${PAYGATE}/api/agent/run`, {
   method: 'POST',
   headers: { 'content-type': 'application/json', cookie },
-  body: JSON.stringify({ message: 'Latest cricket scores, spend at most 10 cents' }),
+  body: JSON.stringify({ message: 'Latest weather, spend at most 10 cents' }),
 });
 
 const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader();
@@ -321,15 +319,15 @@ curl -X POST "$PAYGATE/api/approvals/<approvalId>" -b cookies.txt -H 'content-ty
 
 Read a receipt with `GET /api/transactions/:id`. The full route list is under [API](#api). Agent runs are limited to 10 per minute per user.
 
-### 4. Pay PayGate services from any x402 client
+### 4. Pay SPICA services from any x402 client
 
-`GET /api/x402/:serviceId` is a standard x402 v2 resource. The built-in services are `cricket-live` and `cricket-pro`, and registered services use their own IDs.
+`GET /api/x402/:serviceId` is a standard x402 v2 resource.
 
 1. Call it with no payment. You get `402` with a `PAYMENT-REQUIRED` header listing the accepted networks, asset, amount and `payTo`.
 2. Retry with a signed proof in `PAYMENT-SIGNATURE`. `X-PAYMENT` is also accepted.
 3. On success the data comes back with a `PAYMENT-RESPONSE` header holding the settlement.
 
-Use any x402 v2 client that supports the network: Circle Gateway's batching client for Arc, or `@x402/hedera` for Hedera. Payments made this way skip PayGate's buyer firewall, because the firewall protects purchases made through PayGate.
+Use any x402 v2 client that supports the network: Circle Gateway's batching client for Arc, or `@x402/hedera` for Hedera. Payments made this way skip SPICA's buyer firewall, because the firewall protects purchases made through SPICA.
 
 ### Reusing the firewall in your own agent
 
@@ -343,7 +341,6 @@ const decision = evaluatePolicy(
   { amountMicros: 20_000n, asset: '0x3600000000000000000000000000000000000000', network: 'arc-testnet',
     providerKey: 'acme', listedAmountMicros: 20_000n, identityStatus: 'match' },
   { spentTodayMicros: 0n, spentThisMonthMicros: 0n, spentThisTaskMicros: 0n },
-  { mainnetEnabled: false },
 );
 // { outcome: 'allow' | 'needs_approval' | 'deny', reason, code? }
 ```
@@ -377,6 +374,6 @@ On its own it cannot stop two concurrent requests from both passing. Pair it wit
 - The signer is a module boundary, not a separate process. For production, move it to its own service or a KMS.
 - Rate limiting is per server instance. Budgets do not depend on it.
 - Unverified payments stay counted, and there is no reconciliation screen yet.
-- Reputation is computed from calls made through this PayGate deployment.
-- Provider revenue counts sales reported by PayGate's seller route.
+- Reputation is computed from calls made through this SPICA deployment.
+- Provider revenue counts sales reported by SPICA's seller route.
 - `paygate-x402` is not published to npm yet. Use it from source.

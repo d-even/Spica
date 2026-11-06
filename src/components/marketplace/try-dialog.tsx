@@ -3,12 +3,14 @@
 import { Check, Copy, ExternalLink, Loader2, ShieldAlert, ShieldCheck, X } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { api } from '@/components/api';
+import { api, SIGN_IN_REQUIRED } from '@/components/api';
+import { TrustBadge } from '@/components/spica/ApiCard';
 import { Badge, Button, Input, StatusBadge } from '@/components/ui';
 import { formatUsd } from '@/lib/money';
 import { NETWORKS, networkByCaip2, type NetworkId } from '@/lib/networks';
+import { settlementProof } from '@/lib/proof';
 import { categoryMeta, hostOf, paramFields, shorten, type Service } from './meta';
-import { TrustBadge } from './service-card';
+import type { Quote } from './quote';
 
 interface Receipt {
   id: string;
@@ -65,16 +67,17 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 function ReceiptLine({ receipt }: { receipt: Receipt }) {
   const network = NETWORKS[receipt.network];
-  const explorer = receipt.reference && receipt.status !== 'simulated' ? network?.explorerTx?.(receipt.reference) : undefined;
+  // Only a final payment has a link: a settling Arc payment has a Gateway ID no explorer knows.
+  const proof = settlementProof(receipt);
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
       <StatusBadge status={receipt.status} />
       <span className="text-ink-2">
         {formatUsd(receipt.amountMicros)} on {network?.label ?? receipt.network}
       </span>
-      {explorer && (
-        <a href={explorer} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-accent underline-offset-2 hover:underline">
-          View on explorer <ExternalLink size={12} aria-hidden />
+      {proof && (
+        <a href={proof.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-accent underline-offset-2 hover:underline">
+          {proof.label} <ExternalLink size={12} aria-hidden />
         </a>
       )}
       <Link href={`/transactions/${receipt.id}`} className="text-ink-3 underline-offset-2 hover:underline">
@@ -130,7 +133,7 @@ function Outcome({ result }: { result: BuyResult }) {
     return (
       <div className="rounded-xl bg-warn-bg p-3 text-sm text-warn">
         <p className="font-medium">Already bought a moment ago</p>
-        <p className="mt-1">PayGate refuses identical repeat payments so an agent can never pay twice for the same call. Nothing was charged. Try again shortly.</p>
+        <p className="mt-1">SPICA refuses identical repeat payments so an agent can never pay twice for the same call. Nothing was charged. Try again shortly.</p>
       </div>
     );
   }
@@ -145,7 +148,7 @@ function Outcome({ result }: { result: BuyResult }) {
           </div>
         </div>
         <Link href="/controls" className="inline-flex text-sm font-medium text-accent hover:underline">
-          Adjust spending rules
+          Adjust spending limits
         </Link>
       </div>
     );
@@ -162,7 +165,34 @@ function Outcome({ result }: { result: BuyResult }) {
   );
 }
 
-export function TryDialog({ service, onClose }: { service: Service | null; onClose: () => void }) {
+/** The seller's live terms, read from its 402 answer. Getting them costs nothing. */
+function QuotePanel({ quote }: { quote: Quote }) {
+  if (quote.status === 'loading') {
+    return (
+      <p className="flex items-center gap-2 rounded-xl bg-surface-2 p-3 text-sm">
+        <Loader2 size={15} className="animate-spin" aria-hidden /> Asking the provider for a quote…
+      </p>
+    );
+  }
+  if (quote.status === 'failed') {
+    return <p role="alert" className="rounded-xl bg-bad-bg p-3 text-sm text-bad">{quote.message}</p>;
+  }
+  return (
+    <div className="rounded-xl bg-good-bg p-3 text-sm text-good">
+      <p className="font-bold">Live quote. Nothing has been charged.</p>
+      <ul className="mt-1.5 space-y-1">
+        {quote.terms.map((term) => (
+          <li key={`${term.network}${term.payTo}`} className="flex flex-wrap justify-between gap-x-3">
+            <span>{formatUsd(term.amountAtomic)} USDC on {term.network}</span>
+            <span className="font-mono text-xs" title={term.payTo}>to {shorten(term.payTo)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export function TryDialog({ service, quote, onQuote, onClose }: { service: Service | null; quote?: Quote; onQuote: (service: Service) => void; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [tab, setTab] = useState<'try' | 'agents'>('try');
   const [values, setValues] = useState<Record<string, string>>({});
@@ -219,7 +249,7 @@ export function TryDialog({ service, onClose }: { service: Service | null; onClo
       onClose={onClose}
       onClick={(event) => event.target === ref.current && ref.current?.close()}
       aria-labelledby="try-title"
-      className="m-0 mt-auto max-h-[92vh] w-full max-w-none overflow-hidden rounded-t-3xl border border-line bg-surface p-0 text-ink shadow-card backdrop:bg-black/50 backdrop:backdrop-blur-sm sm:m-auto sm:max-w-lg sm:rounded-3xl"
+      className="m-0 mt-auto max-h-[92vh] w-full max-w-none overflow-hidden rounded-t-3xl border-[3px] border-[#111] bg-surface p-0 text-ink backdrop:bg-black/50 sm:m-auto sm:max-w-lg sm:rounded-3xl"
     >
       <div className="flex max-h-[92vh] flex-col">
         <div className="flex items-start gap-3 border-b border-line p-5">
@@ -283,6 +313,16 @@ export function TryDialog({ service, onClose }: { service: Service | null; onClo
                 </Row>
               </dl>
 
+              {quote ? (
+                <QuotePanel quote={quote} />
+              ) : (
+                service.purchasable && (
+                  <Button type="button" variant="ghost" className="w-full" onClick={() => onQuote(service)}>
+                    Get Quote
+                  </Button>
+                )
+              )}
+
               {fields.length > 0 && (
                 <fieldset className="space-y-2">
                   <legend className="mb-1 text-sm font-medium">Request parameters</legend>
@@ -309,7 +349,13 @@ export function TryDialog({ service, onClose }: { service: Service | null; onClo
                 <>
                   {error && (
                     <p role="alert" className="rounded-xl bg-bad-bg p-3 text-sm text-bad">
-                      {error}
+                      {error === SIGN_IN_REQUIRED ? (
+                        <>
+                          Sign in to buy this API. <Link href="/login" className="font-bold underline">Login</Link>
+                        </>
+                      ) : (
+                        error
+                      )}
                     </p>
                   )}
                   <Button type="submit" className="w-full" disabled={busy || !service.purchasable}>
@@ -354,7 +400,7 @@ export function TryDialog({ service, onClose }: { service: Service | null; onClo
                 </div>
               </div>
               <p className="text-xs text-ink-3">
-                PayGate agents pay through the same spending firewall as this page, and every settled payment can be checked on the network explorer.
+                SPICA agents pay through the same spending firewall as this page, and every settled payment can be checked on the network explorer.
               </p>
             </div>
           )}

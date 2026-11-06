@@ -10,7 +10,7 @@ export interface CatalogOffer {
 /** A purchasable service from any source, in one shape. JSON-safe. */
 export interface CatalogService {
   id: string;
-  source: 'circle' | 'paygate' | 'builtin';
+  source: 'circle' | 'paygate';
   name: string;
   description: string;
   category: string;

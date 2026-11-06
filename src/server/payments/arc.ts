@@ -19,11 +19,6 @@ const CONFIG = {
     gatewayUrl: () => process.env.ARC_TESTNET_GATEWAY_URL ?? 'https://gateway-api-testnet.circle.com',
     rpcUrl: () => process.env.ARC_TESTNET_RPC_URL ?? 'https://rpc.testnet.arc.io',
   },
-  'arc-mainnet': {
-    chain: 'arc',
-    gatewayUrl: () => process.env.ARC_MAINNET_GATEWAY_URL ?? 'https://gateway-api.circle.com',
-    rpcUrl: () => process.env.ARC_MAINNET_RPC_URL ?? 'https://rpc.mainnet.arc.io',
-  },
 } as const;
 
 export class ArcPaymentAdapter implements PaymentAdapter {
@@ -32,7 +27,7 @@ export class ArcPaymentAdapter implements PaymentAdapter {
   private facilitator: BatchFacilitatorClient;
   private config;
 
-  constructor(readonly id: 'arc-testnet' | 'arc-mainnet') {
+  constructor(readonly id: 'arc-testnet') {
     this.info = NETWORKS[id];
     this.network = this.info.caip2;
     this.config = CONFIG[id];

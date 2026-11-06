@@ -67,7 +67,7 @@ export async function signInWithArc(): Promise<string> {
     uri: window.location.origin,
     version: '1',
     nonce,
-    statement: 'Sign in to PayGate. This is free and does not send a transaction.',
+    statement: 'Sign in to SPICA. This is free and does not send a transaction.',
     issuedAt,
     expirationTime: new Date(issuedAt.getTime() + SIGN_IN_TTL_MS),
   });
@@ -76,3 +76,9 @@ export async function signInWithArc(): Promise<string> {
   await api('/api/auth/wallet', { method: 'POST', body: JSON.stringify({ chain: 'arc-testnet', message, signature }) });
   return address;
 }
+
+/**
+ * A full page load, because the router keeps pages alive in memory. Without it,
+ * a page keeps the signed-out state it had, or one wallet's data after sign-out.
+ */
+export const openFresh = (path: string) => window.location.assign(path);

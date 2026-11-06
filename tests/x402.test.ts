@@ -191,7 +191,7 @@ describe('buyer quote handling', () => {
   });
 
   it('ignores a cheap offer on a network that is not enabled', () => {
-    expect(selectRequirement(terms as never, ['arc-mainnet'])).toBeNull();
+    expect(selectRequirement(terms as never, ['demo'])).toBeNull();
   });
 
   it('refuses x402 v1 terms and unreadable bodies', () => {

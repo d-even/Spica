@@ -27,6 +27,15 @@ async function agent(message) {
   return text.split('\n').filter(Boolean).map((line) => JSON.parse(line));
 }
 
+// The marketplace starts empty, so the journey lists its own API first.
+const provider = await json('/api/provider', { method: 'PUT', body: JSON.stringify({ name: 'E2E Provider', walletAddress: '0x000000000000000000000000000000000000dEaD' }) });
+const listed = await json('/api/provider/services', {
+  method: 'POST',
+  body: JSON.stringify({ name: 'Cricket Scores', description: 'Current cricket scores.', endpoint: 'https://api.github.com/zen', price: '0.02', supportedNetworks: ['arc-testnet'] }),
+});
+const serviceId = listed.body.id;
+const providerKey = `paygate:${provider.body.id}`;
+
 const setPolicy = (change) =>
   json('/api/policy', {
     method: 'PUT',
@@ -44,7 +53,7 @@ const setPolicy = (change) =>
   });
 
 // x402 seller
-const unpaid = await fetch(`${base}/api/x402/cricket-live`);
+const unpaid = await fetch(`${base}/api/x402/${serviceId}`);
 check('unpaid request gets HTTP 402', unpaid.status === 402, `status ${unpaid.status}`);
 check('402 carries PAYMENT-REQUIRED', Boolean(unpaid.headers.get('payment-required')));
 const unpaidBody = await unpaid.json();
@@ -54,16 +63,16 @@ check('402 leaks no data', unpaidBody.matches === undefined && unpaidBody.sample
 const forged = Buffer.from(
   JSON.stringify({ x402Version: 2, accepted: unpaidBody.accepts[0], payload: { signature: 'forged' }, resource: unpaidBody.resource }),
 ).toString('base64');
-const invalid = await fetch(`${base}/api/x402/cricket-live`, { headers: { 'PAYMENT-SIGNATURE': forged } });
+const invalid = await fetch(`${base}/api/x402/${serviceId}`, { headers: { 'PAYMENT-SIGNATURE': forged } });
 check('forged proof is rejected', invalid.status === 402, (await invalid.json()).error);
 
 const underpaid = Buffer.from(
   JSON.stringify({ x402Version: 2, accepted: { ...unpaidBody.accepts[0], amount: '1' }, payload: { signature: 'x' }, resource: unpaidBody.resource }),
 ).toString('base64');
-const under = await fetch(`${base}/api/x402/cricket-live`, { headers: { 'PAYMENT-SIGNATURE': underpaid } });
+const under = await fetch(`${base}/api/x402/${serviceId}`, { headers: { 'PAYMENT-SIGNATURE': underpaid } });
 check('underpaying proof is rejected', under.status === 402, (await under.json()).error);
 
-const garbage = await fetch(`${base}/api/x402/cricket-live`, { headers: { 'PAYMENT-SIGNATURE': '!!!' } });
+const garbage = await fetch(`${base}/api/x402/${serviceId}`, { headers: { 'PAYMENT-SIGNATURE': '!!!' } });
 check('garbage proof is rejected', garbage.status === 402);
 
 const missing = await fetch(`${base}/api/x402/does-not-exist`);
@@ -75,7 +84,7 @@ const journey = await agent("Find today's cricket scores and provide the latest 
 const types = journey.map((event) => event.type);
 check('server read the $0.05 budget', journey.find((e) => e.type === 'budget')?.amount === '$0.05');
 check('agent discovered services', types.includes('discovered'));
-check('agent chose the $0.02 service', journey.find((e) => e.type === 'selected')?.service.id === 'cricket-live');
+check('agent chose the $0.02 service', journey.find((e) => e.type === 'selected')?.service.id === serviceId);
 check('firewall approved it', journey.find((e) => e.type === 'policy')?.decision === 'allow');
 const receipt = journey.find((e) => e.type === 'receipt')?.transaction;
 check('receipt issued', Boolean(receipt));
@@ -96,14 +105,12 @@ check('dashboard spend updated from the ledger', overview.body.spend.spentTodayM
 const duplicate = await agent('Find cricket scores. My budget is $0.05.');
 check('identical repeat purchase is stopped', JSON.stringify(duplicate).includes('identical purchase'));
 
-// $2.00 service: only cricket-pro remains, so block expensive by budget
-const expensive = await agent('Get cricket pro feed scores, budget $0.01');
-const denials = expensive.filter((e) => e.type === 'policy' && e.decision === 'deny').map((e) => e.reason);
-check('task budget blocks both services', denials.length >= 1, denials.join(' | '));
+// A budget below every price leaves nothing to buy.
+const expensive = await agent('Get cricket scores, budget $0.001');
 check('no payment was signed', !expensive.some((e) => e.type === 'payment'));
 
 // Blocked provider
-await setPolicy({ blockedProviders: ['paygate:builtin'] });
+await setPolicy({ blockedProviders: [providerKey] });
 const blocked = await agent('Get cricket scores.');
 check('blocked provider is refused', blocked.some((e) => e.type === 'policy' && e.reason.includes('blocklist')));
 check('blocked provider gets no payment', !blocked.some((e) => e.type === 'payment'));

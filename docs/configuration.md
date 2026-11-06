@@ -12,7 +12,6 @@ The `/settings` page shows the mode and which integrations are configured. It li
 | --- | --- | --- |
 | `PAYGATE_MODE` | `demo` | `live` turns on real payments. Anything else is demo |
 | `PAYGATE_PUBLIC_URL` | `http://localhost:3000` | The URL the app is reached at. Built-in and registered services are served from here, and the URL guard trusts this origin |
-| `PAYGATE_ENABLE_MAINNET` | `false` | `true` allows Arc and Hedera mainnet. Policy settings cannot override it |
 
 ### Claude
 
@@ -45,7 +44,6 @@ People sign in with a browser wallet using Sign-In with Ethereum on Arc Testnet 
 | `AGENT_PRIVATE_KEY` | The agent's buyer wallet. A new, dedicated EOA. Enables `arc-testnet` in live mode |
 | `PAYGATE_SELLER_ADDRESS` | Receives payments for the built-in cricket services on Arc. Use a different wallet from the agent |
 | `ARC_TESTNET_RPC_URL`, `ARC_TESTNET_GATEWAY_URL` | Optional overrides. Defaults: `https://rpc.testnet.arc.io`, `https://gateway-api-testnet.circle.com` |
-| `ARC_MAINNET_RPC_URL`, `ARC_MAINNET_GATEWAY_URL` | Optional overrides for mainnet |
 
 ### Hedera
 
@@ -60,7 +58,6 @@ People sign in with a browser wallet using Sign-In with Ethereum on Arc Testnet 
 | Variable | Effect |
 | --- | --- |
 | `HEDERA_OPERATOR_ID`, `HEDERA_OPERATOR_KEY`, `HEDERA_HCS_TOPIC_ID` | All three turn on audit publishing |
-| `HEDERA_HCS_NETWORK` | `mainnet` or testnet (default) |
 
 Audit messages hold opaque IDs only: agent ID, provider key, amount, token, network, reference, status and timestamp. Never keys, emails, prompts or API responses.
 
@@ -86,7 +83,7 @@ Without `CRICAPI_KEY`, demo mode serves labelled sample data, and live mode refu
 
 ### Demo, no keys
 
-Nothing to set. Run `npm run dev` and open `/agent`.
+Nothing to set. Run `npm run dev` and open `/dashboard`.
 
 ### Demo with Claude
 

@@ -1,6 +1,7 @@
 import { isAddress } from 'viem';
 import { z } from 'zod';
-import { authed, toJson } from '@/server/http/api';
+import { isAgentWallet } from '@/server/env';
+import { apiError, authed, toJson } from '@/server/http/api';
 import { computeReputation } from '@/server/reputation';
 import { getStore } from '@/server/store';
 
@@ -32,6 +33,9 @@ export const GET = authed(async (user) => {
  */
 export const PUT = authed(async (user, request) => {
   const input = body.parse(await request.json());
+  if (isAgentWallet(input.walletAddress) || (input.hederaAccount && isAgentWallet(input.hederaAccount))) {
+    return apiError('That account pays for agent purchases, so it cannot receive them. Use a different one.', 400);
+  }
   const provider = await getStore().saveProvider({
     ownerUserId: user.id,
     name: input.name,

@@ -11,7 +11,6 @@ const MUTATIONS = [
   ['task budget check removed', 'src/server/firewall/policy.ts', "    request.taskBudgetMicros !== undefined &&\n    spend.spentThisTaskMicros + amount > request.taskBudgetMicros", '    false'],
   ['approval waives hard limits', 'src/server/firewall/policy.ts', "const { amountMicros: amount, network: networkId, providerKey } = request;", "const { amountMicros: amount, network: networkId, providerKey } = request;\n  if (options.humanApproved) return { outcome: 'allow', reason: 'x' };"],
   ['blocklist ignored', 'src/server/firewall/policy.ts', 'if (policy.blockedProviders.includes(providerKey)) {', 'if (false) {'],
-  ['mainnet guard removed', 'src/server/firewall/policy.ts', 'if (network.mainnet && !options.mainnetEnabled) {', 'if (false) {'],
   ['any asset accepted', 'src/server/firewall/policy.ts', 'if (!network || request.asset.toLowerCase() !== network.tokenAsset.toLowerCase()) {', 'if (!network) {'],
   ['price rise accepted', 'src/server/firewall/policy.ts', 'amount > request.listedAmountMicros', 'false'],
   ['Identity mismatch ignored', 'src/server/firewall/policy.ts', "if (request.identityStatus === 'mismatch') {", 'if (false) {'],

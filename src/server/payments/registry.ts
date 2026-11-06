@@ -10,9 +10,7 @@ const cache = new Map<NetworkId, PaymentAdapter>();
 
 const build: Record<NetworkId, () => PaymentAdapter> = {
   'arc-testnet': () => new ArcPaymentAdapter('arc-testnet'),
-  'arc-mainnet': () => new ArcPaymentAdapter('arc-mainnet'),
   'hedera-testnet': () => new HederaPaymentAdapter('hedera-testnet'),
-  'hedera-mainnet': () => new HederaPaymentAdapter('hedera-mainnet'),
   demo: () => new DemoPaymentAdapter(),
 };
 

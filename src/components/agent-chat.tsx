@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRef, useState, type FormEvent } from 'react';
 import type { AgentEvent, ServiceSummary } from '@/server/agent/session';
 import { NETWORKS, type NetworkId } from '@/lib/networks';
-import { api } from './api';
+import { api, useApi } from './api';
 import { CodeBlock } from './code-block';
 import { LivePayment } from './payment-proof';
 import { Badge, Button, Card, ErrorNote, Textarea } from './ui';
@@ -15,13 +15,6 @@ interface Run {
   events: AgentEvent[];
   running: boolean;
 }
-
-const EXAMPLES = [
-  'I want a weather API for Pune.',
-  'I want a news API about technology.',
-  'I want a stock quotes API for IBM.',
-  'I want a live cricket scores API.',
-];
 
 type Find<T extends AgentEvent['type']> = Extract<AgentEvent, { type: T }>;
 
@@ -82,8 +75,11 @@ function Services({ services }: { services: ServiceSummary[] }) {
   );
 }
 
-export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean; onFinished?: () => void }) {
+export function AgentChat({ onFinished }: { onFinished?: () => void }) {
   const [input, setInput] = useState('');
+  // Examples come from what providers really list, so each one can be bought.
+  const { data: listed } = useApi<{ services: { id: string; name: string; purchasable: boolean }[] }>('/api/marketplace');
+  const examples = (listed?.services ?? []).filter((service) => service.purchasable).slice(0, 4);
   const [run, setRun] = useState<Run>();
   const [error, setError] = useState<string>();
   const form = useRef<HTMLFormElement>(null);
@@ -156,17 +152,23 @@ export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean
           />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">
-              {EXAMPLES.map((example) => (
+              {examples.map(({ id, name }) => (
                 <button
-                  key={example}
+                  key={id}
                   type="button"
                   disabled={run?.running}
-                  onClick={() => send(example)}
+                  onClick={() => send(`I want the ${name} API.`)}
                   className="min-h-9 rounded-full border border-line px-3 text-left text-xs text-ink-2 hover:bg-surface-2 disabled:opacity-50"
                 >
-                  {example}
+                  I want the {name} API.
                 </button>
               ))}
+              {listed && examples.length === 0 && (
+                <p className="text-xs text-ink-3">
+                  No APIs are listed yet.{' '}
+                  <Link href="/provider" className="font-medium text-accent">Add yours</Link>
+                </p>
+              )}
             </div>
             <Button type="submit" disabled={run?.running || !input.trim()}>
               {run?.running && <Loader2 size={15} className="animate-spin" aria-hidden />}
@@ -179,8 +181,7 @@ export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean
       {error && <ErrorNote>{error}</ErrorNote>}
 
       {run && (
-        <div className={detailed ? 'grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_300px]' : 'space-y-4'}>
-          <div className="min-w-0 space-y-4">
+        <div className="min-w-0 space-y-4">
             <Card title={run.prompt.length > 70 ? `${run.prompt.slice(0, 70)}…` : run.prompt}>
               <ul className="space-y-2" aria-live="polite">
                 {events.map((event, index) => (
@@ -229,10 +230,7 @@ export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean
                 )}
               </Card>
             )}
-          </div>
 
-          {detailed && (
-            <div className="min-w-0 space-y-4">
               {discovered && (
                 <Card title="Discovered services">
                   {discovered.services.length ? <Services services={discovered.services} /> : <p className="text-sm text-ink-3">No matches.</p>}
@@ -253,15 +251,7 @@ export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean
                   </Link>
                 </Card>
               )}
-            </div>
-          )}
         </div>
-      )}
-
-      {!detailed && receipt && (
-        <Link href={`/transactions/${receipt.transaction.id}`} className="block text-sm font-medium text-accent">
-          View receipt for {receipt.transaction.amount}
-        </Link>
       )}
     </div>
   );

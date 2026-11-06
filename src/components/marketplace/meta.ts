@@ -1,4 +1,4 @@
-import { Boxes, Landmark, Palette, Search, Server, Shapes, TrendingUp, Trophy, Users, type LucideIcon } from 'lucide-react';
+import { Bot, Boxes, CloudSun, Code2, Database, Landmark, Newspaper, Palette, Search, Server, Shapes, TrendingUp, Trophy, Users, type LucideIcon } from 'lucide-react';
 import type { ReputationDto } from '@/components/api';
 import type { CatalogService } from '@/server/discovery/types';
 
@@ -10,21 +10,30 @@ export interface CategoryMeta {
   Icon: LucideIcon;
 }
 
-/** Circle's categories plus the ones PayGate's own listings use. */
+/** What a provider can list under, and what the marketplace filters on. */
 export const CATEGORY_LIST: CategoryMeta[] = [
   { value: '', label: 'All', Icon: Boxes },
+  { value: 'WEATHER', label: 'Weather', Icon: CloudSun },
   { value: 'FINANCIAL_ANALYSIS', label: 'Finance', Icon: TrendingUp },
+  { value: 'NEWS', label: 'News', Icon: Newspaper },
+  { value: 'DATA', label: 'Data', Icon: Database },
+  { value: 'AI', label: 'AI', Icon: Bot },
+  { value: 'DEVELOPER_TOOLS', label: 'Developer tools', Icon: Code2 },
+  { value: 'OTHER', label: 'Other', Icon: Shapes },
+];
+
+/** Circle's categories, labelled when its catalog is switched on. */
+const CIRCLE_CATEGORIES: CategoryMeta[] = [
   { value: 'WEB_SEARCH_RESEARCH', label: 'Search & research', Icon: Search },
   { value: 'SOCIAL_INTELLIGENCE', label: 'Social', Icon: Users },
   { value: 'PREDICTION_MARKETS', label: 'Prediction markets', Icon: Landmark },
   { value: 'CREATIVE', label: 'Creative', Icon: Palette },
   { value: 'INFRASTRUCTURE', label: 'Infrastructure', Icon: Server },
   { value: 'SPORTS', label: 'Sports', Icon: Trophy },
-  { value: 'OTHER', label: 'Other', Icon: Shapes },
 ];
 
 export function categoryMeta(value: string): CategoryMeta {
-  return CATEGORY_LIST.find((item) => item.value === value.toUpperCase()) ?? { value, label: value || 'Other', Icon: Shapes };
+  return [...CATEGORY_LIST, ...CIRCLE_CATEGORIES].find((item) => item.value === value.toUpperCase()) ?? { value, label: value || 'Other', Icon: Shapes };
 }
 
 export const hostOf = (url: string) => {

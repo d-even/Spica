@@ -121,9 +121,8 @@ Every step reports progress through `emit`, which the route streams to the brows
 | `/` | Landing page |
 | `/login` | Wallet sign-in: Arc Testnet now, Hedera Testnet coming soon |
 | `/dashboard` | Spend against limits, recent activity, pending approvals |
-| `/agent` | Chat with the agent, with live events and approval prompts |
-| `/controls` | The spending policy editor |
 | `/marketplace` | Browse the catalog with measured reputation |
+| `/controls` | The spending limits editor |
 | `/transactions`, `/transactions/[id]` | Receipts and their verification details |
 | `/provider` | Provider profile, registered services, sales |
 | `/settings` | Mode, and which integrations are configured |

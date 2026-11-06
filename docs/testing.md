@@ -17,7 +17,7 @@ Vitest, configured in `vitest.config.mts`. It aliases `@` to `src`, `paygate-x40
 
 ### `tests/firewall.test.ts`
 
-- **Policy decisions**: auto-approval at $0.02, approval above the threshold, $2.00 blocked even with approval, task budgets including earlier spend, exact limit boundaries, monthly limit, blocklist and allowlist, networks, mainnet guard, asset checks including another network's token, price rises, ENS mismatch, invalid amounts, auto-pay off.
+- **Policy decisions**: auto-approval at $0.02, approval above the threshold, $2.00 blocked even with approval, task budgets including earlier spend, exact limit boundaries, monthly limit, blocklist and allowlist, networks, asset checks including another network's token, price rises, ENS mismatch, invalid amounts, auto-pay off.
 - **Atomic reservations**: 50 concurrent $0.30 requests against $1.00, concurrent task budgets, duplicates and the duplicate window, the single-use signing gate, releasing holds, keeping unknown outcomes counted, hold expiry before and after signing, daily and monthly window resets.
 - **Human approvals**: decided once even when raced, not by another user, not after expiry.
 

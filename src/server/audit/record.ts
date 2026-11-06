@@ -1,6 +1,5 @@
 import 'server-only';
 import { auditProof } from '@/lib/proof';
-import { NETWORKS } from '@/lib/networks';
 import { hcsConfigured, publishAuditEvent } from '@/server/audit/hcs';
 import type { SpendStore, TransactionRecord } from '@/server/store/types';
 
@@ -26,7 +25,7 @@ export async function auditPayment(store: SpendStore, transaction: TransactionRe
     });
     if (!result) return;
     await store.appendActivity({ userId, transactionId, eventType: 'hcs_published', eventData: { ...result, status: transaction.status } });
-    const proof = auditProof(transaction.status, result.sequence, result.transactionId, NETWORKS[transaction.network].mainnet);
+    const proof = auditProof(transaction.status, result.sequence, result.transactionId);
     console.log(`[proof] ${proof.label}: ${proof.url}`);
   } catch (error) {
     console.error('[proof] Audit publish failed:', (error as Error).message);
