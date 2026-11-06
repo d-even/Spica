@@ -172,3 +172,5 @@ Write a `SellerAdapter` to add a network. The middleware only knows the protocol
 - ENS shows identity only. It says nothing about the quality of an API.
 - Reputation is computed from calls made through this PayGate deployment.
 - Provider revenue counts sales reported by PayGate's seller route.
+#   P a y G a t e  
+ 
