@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { CodeBlock } from '@/components/code-block';
 import { use } from 'react';
 import { useApi, type TransactionDto } from '@/components/api';
 import { Card, ErrorNote, Loading, PageHeader, StatusBadge } from '@/components/ui';
@@ -20,7 +21,6 @@ export default function Receipt({ params }: { params: Promise<{ id: string }> })
     ['Transaction ID', <span key="id" className="font-mono text-xs">{tx.id}</span>],
     ['Agent', <span key="agent" className="font-mono text-xs">{tx.agentId}</span>],
     ['Provider', tx.providerName],
-    ['Provider ENS', tx.providerEns ?? 'None'],
     ['API', tx.serviceName],
     ['Amount', `${formatUsd(tx.amountMicros)} ${tx.token}`],
     ['Network', network.label],
@@ -42,6 +42,7 @@ export default function Receipt({ params }: { params: Promise<{ id: string }> })
           ))}
         </dl>
       </Card>
+      {tx.usageCode && <Card className="mt-4 max-w-2xl" title="Your API"><CodeBlock code={tx.usageCode} /></Card>}
       <Link href="/transactions" className="mt-4 inline-block text-sm font-medium text-accent">Back to payments</Link>
     </>
   );

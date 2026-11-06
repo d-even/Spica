@@ -37,5 +37,7 @@ export const GET = authed(async (user, _request, { params }: { params: Promise<{
   const store = getStore();
   const transaction = await store.getTransaction(user.id, id);
   if (!transaction) return apiError('Receipt not found.', 404);
-  return toJson(await refreshSettling(store, transaction));
+  const activity = await store.listActivity(user.id, 500);
+  const usageCode = activity.find((event) => event.eventType === 'usage_code' && event.transactionId === id)?.eventData.code ?? null;
+  return toJson({ ...(await refreshSettling(store, transaction)), usageCode });
 });

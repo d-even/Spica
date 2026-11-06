@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { SELECTABLE_NETWORKS, type NetworkId } from '@/lib/networks';
-import { builtinServices } from '@/server/discovery/catalog';
+import { NETWORKS, SELECTABLE_NETWORKS, type NetworkId } from '@/lib/networks';
+import { localServices } from '@/server/discovery/catalog';
 import { CATEGORIES, discover } from '@/server/discovery/circle';
 import { apiError, authed, toJson } from '@/server/http/api';
 import { computeReputation } from '@/server/reputation';
@@ -20,8 +20,10 @@ export const GET = authed(async (_user, request) => {
   const input = query.parse(params);
   const store = getStore();
 
-  const local = input.offset === 0 && !input.category ? builtinServices() : [];
   try {
+    // PayGate's own services lead the first page. They have no Circle category.
+    const listed = input.offset === 0 && !input.category ? await localServices(input.query) : [];
+    const local = listed.filter((service) => !input.network || service.allNetworks.includes(NETWORKS[input.network].caip2));
     const page = await discover({ ...input, limit: PAGE_SIZE });
     const services = await Promise.all(
       [...local, ...page.services].map(async (service) => ({
@@ -29,7 +31,7 @@ export const GET = authed(async (_user, request) => {
         reputation: computeReputation(await store.listObservations(service.id)),
       })),
     );
-    return toJson({ services, total: page.total, pageSize: PAGE_SIZE });
+    return toJson({ services, total: page.total + local.length, pageSize: PAGE_SIZE });
   } catch (error) {
     console.error('Discovery failed:', error);
     return apiError('The marketplace is unavailable right now. Try again shortly.', 502);

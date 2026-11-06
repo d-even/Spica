@@ -68,7 +68,6 @@ export interface TransactionDto {
   agentId: string;
   providerName: string;
   providerKey: string;
-  providerEns: string | null;
   serviceName: string;
   resource: string;
   amountMicros: string;
@@ -78,6 +77,7 @@ export interface TransactionDto {
   payer: string | null;
   payTo: string;
   status: string;
+  usageCode?: string | null;
   statusDetail: string | null;
   createdAt: string;
 }

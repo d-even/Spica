@@ -40,7 +40,6 @@ export interface TransactionRecord {
   taskId: string;
   providerKey: string;
   providerName: string;
-  providerEns: string | null;
   serviceId: string;
   serviceName: string;
   resource: string;
@@ -60,6 +59,7 @@ export interface ApprovalRequest {
   service: CatalogService;
   params?: Record<string, string>;
   taskBudgetMicros?: string;
+  preferredNetwork?: NetworkId;
 }
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'expired';
@@ -94,7 +94,6 @@ export interface ProviderRecord {
   id: string;
   ownerUserId: string;
   name: string;
-  ensName: string | null;
   walletAddress: string;
   hederaAccount: string | null;
   createdAt: string;
@@ -110,6 +109,8 @@ export interface ServiceRecord {
   priceMicros: bigint;
   supportedNetworks: NetworkId[];
   enabled: boolean;
+  /** Released to a buyer only after payment. Never part of a catalog entry. */
+  usageCode: string | null;
   createdAt: string;
 }
 

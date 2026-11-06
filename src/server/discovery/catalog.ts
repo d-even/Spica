@@ -1,7 +1,8 @@
 import 'server-only';
-import { microsToUsd } from '@/lib/money';
+import { microsToUsd, usdToMicros } from '@/lib/money';
 import { NETWORKS, type NetworkId } from '@/lib/networks';
 import { activeNetworks, mode, publicUrl } from '@/server/env';
+import { feedKeyName, isFeedId } from '@/server/feeds';
 import { getStore } from '@/server/store';
 import type { ServiceRecord } from '@/server/store/types';
 import { discover } from './circle';
@@ -12,7 +13,28 @@ import type { CatalogService } from './types';
  * end-to-end journey runs against these real x402 endpoints. `cricket-pro` is
  * the expensive option the firewall is expected to refuse.
  */
-const BUILTIN = [
+const BUILTIN: { id: string; name: string; description: string; priceMicros: string; input?: Record<string, string> }[] = [
+  {
+    id: 'weather-live',
+    name: 'Weather Forecast',
+    description: 'Current weather and a 3-day forecast for any city.',
+    priceMicros: '10000',
+    input: { q: 'City name, for example Pune' },
+  },
+  {
+    id: 'news-live',
+    name: 'News Headlines',
+    description: 'Top news headlines, or news articles about any topic.',
+    priceMicros: '20000',
+    input: { q: 'Optional topic, for example bitcoin' },
+  },
+  {
+    id: 'finance-quote',
+    name: 'Stock Quotes',
+    description: 'Finance data: the latest stock market price for a ticker symbol.',
+    priceMicros: '10000',
+    input: { symbol: 'Ticker symbol, for example IBM' },
+  },
   {
     id: 'cricket-live',
     name: 'Cricket Live Scores',
@@ -25,7 +47,7 @@ const BUILTIN = [
     description: 'The same cricket feed at a premium price.',
     priceMicros: '2000000',
   },
-] as const;
+];
 
 export const isBuiltinId = (id: string) => BUILTIN.some((service) => service.id === id);
 
@@ -40,7 +62,9 @@ export function builtinPayTo(network: NetworkId): string | null {
 
 export function builtinServices(): CatalogService[] {
   const networks = activeNetworks().filter((network) => builtinPayTo(network));
-  return BUILTIN.map((service) => ({
+  // A resold API with no key on this server cannot deliver, so it is not listed.
+  const available = BUILTIN.filter((service) => !isFeedId(service.id) || process.env[feedKeyName(service.id)]);
+  return available.map((service) => ({
     id: service.id,
     source: 'builtin' as const,
     name: service.name,
@@ -48,7 +72,6 @@ export function builtinServices(): CatalogService[] {
     category: 'SPORTS',
     providerName: mode() === 'demo' ? 'PayGate Demo Provider' : 'PayGate',
     providerKey: 'paygate:builtin',
-    providerEns: null,
     endpoint: `${publicUrl()}/api/x402/${service.id}`,
     method: 'GET',
     offers: networks.map((network) => ({
@@ -60,7 +83,7 @@ export function builtinServices(): CatalogService[] {
     listedMicros: service.priceMicros,
     listedUsd: microsToUsd(service.priceMicros),
     allNetworks: networks.map((network) => NETWORKS[network].caip2),
-    inputSchema: null,
+    inputSchema: service.input ?? null,
     purchasable: networks.length > 0,
     supportsGateway: false,
   }));
@@ -69,7 +92,8 @@ export function builtinServices(): CatalogService[] {
 export async function registeredToCatalog(service: ServiceRecord): Promise<CatalogService | null> {
   const provider = await getStore().getProvider(service.providerId);
   if (!provider) return null;
-  const networks = service.supportedNetworks.filter((network) => activeNetworks().includes(network));
+  // Demo mode has one simulated rail, so every service is offered on it.
+  const networks = mode() === 'demo' ? (['demo'] as NetworkId[]) : service.supportedNetworks.filter((network) => activeNetworks().includes(network));
   const payTo = (network: NetworkId) => (NETWORKS[network].family === 'hedera' ? provider.hederaAccount : provider.walletAddress);
   const offers = networks.flatMap((network) => {
     const address = payTo(network);
@@ -85,7 +109,6 @@ export async function registeredToCatalog(service: ServiceRecord): Promise<Catal
     category: service.category,
     providerName: provider.name,
     providerKey: `paygate:${provider.id}`,
-    providerEns: provider.ensName,
     endpoint: `${publicUrl()}/api/x402/${service.id}`,
     method: 'GET',
     offers,
@@ -105,15 +128,23 @@ const matches = (service: CatalogService, query: string) =>
     .filter(Boolean)
     .some((word) => `${service.name} ${service.description} ${service.category}`.toLowerCase().includes(word));
 
-/** PayGate services first, then the Circle catalog filtered to payable networks. */
-export async function findServices(input: { query: string; category?: string; maxUsdPrice?: string; limit?: number }) {
+/** Built-in and provider-registered services. The agent and the marketplace both read this. */
+export async function localServices(query?: string) {
   const local = [...builtinServices()];
   const registered = await getStore().listServices({ enabledOnly: true });
   for (const service of registered) {
     const entry = await registeredToCatalog(service);
     if (entry) local.push(entry);
   }
-  const relevant = input.query ? local.filter((service) => matches(service, input.query)) : local;
+  return query ? local.filter((service) => matches(service, query)) : local;
+}
+
+/** PayGate services first, then the Circle catalog filtered to payable networks. */
+export async function findServices(input: { query: string; category?: string; maxUsdPrice?: string; limit?: number }) {
+  const local = await localServices(input.query);
+  const relevant = input.maxUsdPrice
+    ? local.filter((service) => service.listedMicros !== null && BigInt(service.listedMicros) <= usdToMicros(input.maxUsdPrice!))
+    : local;
 
   const live = activeNetworks().filter((network) => network !== 'demo');
   const pages = await Promise.allSettled(

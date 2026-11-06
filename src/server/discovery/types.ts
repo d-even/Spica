@@ -16,7 +16,6 @@ export interface CatalogService {
   category: string;
   providerName: string;
   providerKey: string;
-  providerEns: string | null;
   endpoint: string;
   method: string;
   offers: CatalogOffer[];

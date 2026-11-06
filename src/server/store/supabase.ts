@@ -38,7 +38,6 @@ const toTransaction = (row: Row): TransactionRecord => ({
   taskId: row.task_id,
   providerKey: row.provider_key,
   providerName: row.provider_name,
-  providerEns: row.provider_ens,
   serviceId: row.service_id,
   serviceName: row.service_name,
   resource: row.resource,
@@ -74,7 +73,6 @@ const toProvider = (row: Row): ProviderRecord => ({
   id: row.id,
   ownerUserId: row.owner_user_id,
   name: row.name ?? '',
-  ensName: row.ens_name,
   walletAddress: row.wallet_address,
   hederaAccount: row.hedera_account,
   createdAt: row.created_at,
@@ -90,6 +88,7 @@ const toService = (row: Row): ServiceRecord => ({
   priceMicros: big(row.price_micros),
   supportedNetworks: row.supported_networks ?? [],
   enabled: row.enabled ?? false,
+  usageCode: row.usage_code ?? null,
   createdAt: row.created_at,
 });
 
@@ -265,7 +264,6 @@ export class SupabaseStore implements SpendStore {
             task_id: record.taskId,
             provider_key: record.providerKey,
             provider_name: record.providerName,
-            provider_ens: record.providerEns,
             service_id: record.serviceId,
             service_name: record.serviceName,
             resource: record.resource,
@@ -382,7 +380,6 @@ export class SupabaseStore implements SpendStore {
               name: record.name,
               // Legacy NOT NULL column. Wallet accounts have no email.
               email: '',
-              ens_name: record.ensName,
               wallet_address: record.walletAddress,
               hedera_account: record.hederaAccount,
             },
@@ -413,6 +410,8 @@ export class SupabaseStore implements SpendStore {
             supported_networks: record.supportedNetworks,
             enabled: record.enabled,
             is_public: true,
+            // Left out when empty, so listing an API works before the column exists.
+            ...(record.usageCode ? { usage_code: record.usageCode } : {}),
           })
           .select('*')
           .single(),

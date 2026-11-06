@@ -1,6 +1,7 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
-import { formatUsd } from '@/lib/money';
+import { formatUsd, microsToUsd } from '@/lib/money';
+import type { NetworkId } from '@/lib/networks';
 import { findServices } from '@/server/discovery/catalog';
 import type { CatalogService } from '@/server/discovery/types';
 import { purchase, type PurchaseContext, type PurchaseEvent, type PurchaseResult } from '@/server/purchase';
@@ -37,6 +38,7 @@ export const summarize = (service: CatalogService): ServiceSummary => ({
 });
 
 const MAX_PURCHASES_PER_RUN = 3;
+const MAX_SEARCHES_PER_RUN = 3;
 /** Provider text reaches the model only inside this envelope, marked as data. */
 const MAX_DATA_FOR_MODEL = 20_000;
 
@@ -52,17 +54,26 @@ export class AgentSession {
   readonly taskId = randomUUID();
   private services = new Map<string, CatalogService>();
   private purchases = 0;
+  private searches = 0;
 
   constructor(
     private store: SpendStore,
     private userId: string,
     private agentId: string,
     private taskBudgetMicros: bigint | undefined,
+    private preferredNetwork: NetworkId | undefined,
     readonly emit: (event: AgentEvent) => void,
   ) {}
 
   async discover(input: { query: string; category?: string; max_price_usd?: string }) {
-    const maxUsdPrice = input.max_price_usd;
+    if (this.searches >= MAX_SEARCHES_PER_RUN) {
+      return { services: [], failures: [], note: 'Search limit reached. Tell the person nothing suitable fits their request and budget.' };
+    }
+    this.searches += 1;
+    // The stated budget caps the search, whatever price the model asks for.
+    const budget = this.taskBudgetMicros === undefined ? undefined : microsToUsd(this.taskBudgetMicros);
+    const asked = input.max_price_usd && /^\d+(\.\d+)?$/.test(input.max_price_usd) ? input.max_price_usd : undefined;
+    const maxUsdPrice = asked && budget ? (Number(asked) < Number(budget) ? asked : budget) : (budget ?? asked);
     const { services, failures } = await findServices({ query: input.query, category: input.category, maxUsdPrice });
     for (const service of services) this.services.set(service.id, service);
     const summaries = services.map(summarize);
@@ -79,7 +90,6 @@ export class AgentSession {
       description: service.description,
       method: service.method,
       input_schema: service.inputSchema,
-      identity: service.providerEns ?? 'No ENS name claimed',
       reputation:
         reputation.status === 'scored'
           ? { score: reputation.score, sample_size: reputation.sampleSize }
@@ -110,6 +120,7 @@ export class AgentSession {
       agentId: this.agentId,
       taskId: this.taskId,
       taskBudgetMicros: this.taskBudgetMicros,
+      preferredNetwork: this.preferredNetwork,
       emit: this.emit,
     };
     const result = await purchase(context, { service, params });

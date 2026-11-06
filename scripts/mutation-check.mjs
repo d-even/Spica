@@ -14,7 +14,6 @@ const MUTATIONS = [
   ['mainnet guard removed', 'src/server/firewall/policy.ts', 'if (network.mainnet && !options.mainnetEnabled) {', 'if (false) {'],
   ['any asset accepted', 'src/server/firewall/policy.ts', 'if (!network || request.asset.toLowerCase() !== network.tokenAsset.toLowerCase()) {', 'if (!network) {'],
   ['price rise accepted', 'src/server/firewall/policy.ts', 'amount > request.listedAmountMicros', 'false'],
-  ['ENS mismatch ignored', 'src/server/firewall/policy.ts', "if (request.identityStatus === 'mismatch') {", 'if (false) {'],
   ['reservation skips daily budget', 'src/server/store/memory.ts', "if (state.spentTodayMicros + input.amountMicros > input.dailyLimitMicros) return { ok: false, reason: 'daily_limit' };", ''],
   ['reservation skips task budget', 'src/server/store/memory.ts', 'if (input.taskBudgetMicros !== undefined && state.spentThisTaskMicros + input.amountMicros > input.taskBudgetMicros) {', 'if (false) {'],
   ['duplicates allowed', 'src/server/store/memory.ts', "return { ok: false, reason: 'duplicate' };", ''],
@@ -32,12 +31,14 @@ const MUTATIONS = [
 let survived = 0;
 for (const [name, file, from, to] of MUTATIONS) {
   const original = fs.readFileSync(file, 'utf8');
-  if (!original.includes(from)) {
+  // Git may check files out with CRLF on Windows, which multi-line patterns must follow.
+  const pattern = original.includes('\r\n') ? from.replaceAll('\n', '\r\n') : from;
+  if (!original.includes(pattern)) {
     console.log(`STALE     ${name}: pattern not found`);
     survived += 1;
     continue;
   }
-  fs.writeFileSync(file, original.replace(from, to));
+  fs.writeFileSync(file, original.replace(pattern, to));
   try {
     const run = spawnSync('npx', ['vitest', 'run'], { encoding: 'utf8', shell: true });
     const caught = run.status !== 0;

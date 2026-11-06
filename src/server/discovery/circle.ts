@@ -93,7 +93,6 @@ export function toCatalogService(raw: unknown): CatalogService | null {
     category: metadata?.provider?.category ?? 'OTHER',
     providerName,
     providerKey: providerSlug(providerName),
-    providerEns: null,
     endpoint: resource,
     method: metadata?.method ?? 'GET',
     offers,

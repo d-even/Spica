@@ -6,9 +6,10 @@ import { useRef, useState, type FormEvent } from 'react';
 import type { AgentEvent, ServiceSummary } from '@/server/agent/session';
 import { NETWORKS, type NetworkId } from '@/lib/networks';
 import { api } from './api';
+import { CodeBlock } from './code-block';
 import { Badge, Button, Card, ErrorNote, StatusBadge, Textarea } from './ui';
 
-const EXAMPLE = "Find today's cricket scores and give me the latest match updates. My total budget is $0.05.";
+const EXAMPLE = 'I want a live cricket scores API. My budget is $0.05, pay on Arc.';
 
 interface Run {
   prompt: string;
@@ -48,8 +49,6 @@ function Step({ event }: { event: AgentEvent }) {
       return row(<ChevronRight size={15} aria-hidden />, `Trying ${event.service.name} from ${event.service.provider}`);
     case 'quote':
       return row(done, `Provider quoted ${event.amount} on ${NETWORKS[event.network as NetworkId]?.label ?? event.network}`);
-    case 'identity':
-      return event.identity.status === 'none' ? null : row(done, `Identity: ${event.identity.detail}`);
     case 'policy':
       if (event.decision === 'allow') return row(<ShieldCheck size={15} className="text-good" aria-hidden />, `Spending Firewall approved: ${event.reason}`);
       if (event.decision === 'deny') return row(<ShieldAlert size={15} className="text-bad" aria-hidden />, `Spending Firewall blocked: ${event.reason}`);
@@ -135,7 +134,7 @@ export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean
           <Textarea
             rows={3}
             aria-label="Ask the agent"
-            placeholder="Ask for something. Mention a budget if you like."
+            placeholder="What kind of API do you want, and what will you pay? For example: a weather API, budget $0.05, pay on Hedera."
             value={input}
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={(event) => {
@@ -147,7 +146,7 @@ export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean
           />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <button type="button" onClick={() => setInput(EXAMPLE)} className="text-left text-xs text-ink-3 underline underline-offset-2">
-              Try the cricket example
+              Try an example
             </button>
             <Button type="submit" disabled={run?.running || !input.trim()}>
               {run?.running && <Loader2 size={15} className="animate-spin" aria-hidden />}
@@ -185,6 +184,13 @@ export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean
                 <Link href="/dashboard" className="mt-2 inline-block text-sm font-medium text-accent">
                   Review on your dashboard
                 </Link>
+              </Card>
+            )}
+
+            {receipt?.transaction.usageCode && (
+              <Card title="Your API" className="rise">
+                <p className="mb-2 text-sm text-ink-2">Paste this into your code. Each call pays {receipt.transaction.amount} from the agent wallet, and counts toward your budget and Spending Firewall limits. Keep the key private.</p>
+                <CodeBlock code={receipt.transaction.usageCode} />
               </Card>
             )}
 

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { usdToMicros } from '@/lib/money';
+import { isValidUsageCode, MAX_USAGE_LINES } from '@/lib/usage-code';
 import { SELECTABLE_NETWORKS, type NetworkId } from '@/lib/networks';
 import { apiError, authed, toJson } from '@/server/http/api';
 import { assertPublicUrl } from '@/server/http/guard';
@@ -14,6 +15,7 @@ const body = z.object({
   supportedNetworks: z
     .array(z.enum(SELECTABLE_NETWORKS as [NetworkId, ...NetworkId[]]))
     .min(1, 'Choose at least one payment network.'),
+  usageCode: z.string().trim().refine(isValidUsageCode, `Keep the code to ${MAX_USAGE_LINES} lines.`).default(''),
 });
 
 export const POST = authed(async (user, request) => {
@@ -40,6 +42,7 @@ export const POST = authed(async (user, request) => {
     priceMicros: input.price,
     supportedNetworks: input.supportedNetworks,
     enabled: true,
+    usageCode: input.usageCode || null,
   });
   return toJson(service);
 });

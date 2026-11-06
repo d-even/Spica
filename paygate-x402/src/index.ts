@@ -27,6 +27,9 @@ export type { PaymentPayload, PaymentRequired, PaymentRequirements, SettleRespon
 
 export const X402_VERSION = 2;
 
+/** Sent when the handler failed, so settlement never ran and the buyer was not charged. */
+export const NOT_SETTLED_HEADER = 'PAYMENT-NOT-SETTLED';
+
 /** Network-specific seller behaviour. One adapter per payment network. */
 export interface SellerAdapter {
   /** CAIP-2 network identifier, e.g. `eip155:5042002` or `hedera:testnet`. */
@@ -169,6 +172,7 @@ export function withPayment(
       const upstream = await handler(request, { payer: verification.payer });
       if (!upstream.ok) {
         await emit(options, { type: 'handler_failed', status: upstream.status, network: offered.network });
+        upstream.headers.set(NOT_SETTLED_HEADER, 'true');
         return upstream;
       }
 

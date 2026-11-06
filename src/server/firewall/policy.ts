@@ -45,8 +45,6 @@ export interface PaymentRequest {
   listedAmountMicros?: bigint;
   /** Budget the person stated for this task, if any. */
   taskBudgetMicros?: bigint;
-  /** Result of comparing a claimed ENS name with the payment address. */
-  identityStatus?: 'match' | 'mismatch' | 'none';
 }
 
 export interface SpendState {
@@ -62,7 +60,6 @@ export type DenyCode =
   | 'mainnet_disabled'
   | 'provider_blocked'
   | 'provider_not_allowlisted'
-  | 'identity_mismatch'
   | 'price_changed'
   | 'per_request_limit'
   | 'task_budget'
@@ -106,9 +103,6 @@ export function evaluatePolicy(
   }
   if (policy.allowedProviders.length > 0 && !policy.allowedProviders.includes(providerKey)) {
     return deny('provider_not_allowlisted', 'This provider is not on your allowlist.');
-  }
-  if (request.identityStatus === 'mismatch') {
-    return deny('identity_mismatch', "The provider's ENS name does not resolve to the payment address.");
   }
   if (request.listedAmountMicros !== undefined && amount > request.listedAmountMicros) {
     return deny(

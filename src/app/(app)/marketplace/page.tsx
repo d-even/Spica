@@ -33,7 +33,7 @@ function ServiceCard({ service }: { service: Service }) {
       <dl className="mt-3 space-y-1 text-xs text-ink-3">
         <div className="flex justify-between gap-2">
           <dt>Provider</dt>
-          <dd className="truncate text-ink-2">{service.providerEns ?? service.providerName}</dd>
+          <dd className="truncate text-ink-2">{service.providerName}</dd>
         </div>
         <div className="flex justify-between gap-2">
           <dt>Provider ID</dt>

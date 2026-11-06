@@ -20,6 +20,11 @@ const feed = z.object({
     .optional(),
 });
 
+/** CricketData allows 100 calls a day, and a slow response must not fail a sale. */
+const FRESH_MS = 60_000;
+const STALE_LIMIT_MS = 30 * 60_000;
+let lastFeed: { at: number; feed: CricketFeed } | undefined;
+
 export interface CricketFeed {
   source: string;
   sample: boolean;
@@ -31,17 +36,21 @@ export interface CricketFeed {
 export async function loadCricketFeed(): Promise<CricketFeed | null> {
   const apiKey = process.env.CRICAPI_KEY;
   if (apiKey) {
+    if (lastFeed && Date.now() - lastFeed.at < FRESH_MS) return lastFeed.feed;
+    const stale = lastFeed && Date.now() - lastFeed.at < STALE_LIMIT_MS ? lastFeed.feed : null;
     const url = new URL(CRICKET_URL);
     url.searchParams.set('apikey', apiKey);
     url.searchParams.set('offset', '0');
     try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(10_000), cache: 'no-store' });
+      const response = await fetch(url, { signal: AbortSignal.timeout(12_000), cache: 'no-store' });
       const parsed = feed.parse(await response.json());
-      if (parsed.status !== 'success' || !parsed.data) return null;
-      return { source: 'CricketData.org', sample: false, fetchedAt: new Date().toISOString(), matches: parsed.data };
+      if (parsed.status !== 'success' || !parsed.data) return stale;
+      const loaded = { source: 'CricketData.org', sample: false, fetchedAt: new Date().toISOString(), matches: parsed.data };
+      lastFeed = { at: Date.now(), feed: loaded };
+      return loaded;
     } catch (error) {
       console.error('Cricket feed failed:', (error as Error).message);
-      return null;
+      return stale;
     }
   }
   if (mode() === 'live') return null;

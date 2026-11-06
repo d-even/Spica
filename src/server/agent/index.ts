@@ -2,8 +2,9 @@ import 'server-only';
 
 import { ApiError } from '@google/genai';
 import { formatUsd } from '@/lib/money';
+import { NETWORKS } from '@/lib/networks';
 import { getStore } from '@/server/store';
-import { parseTaskBudget } from './budget';
+import { parseTaskBudget, parseTaskNetwork } from './budget';
 import { runGeminiAgent } from './claude';
 import { runDemoAgent } from './demo';
 import { AgentSession, type AgentEvent } from './session';
@@ -29,7 +30,10 @@ export async function runAgent(userId: string, message: string, emit: (event: Ag
   const taskBudget = parseTaskBudget(message);
   if (taskBudget !== undefined) emit({ type: 'budget', amount: formatUsd(taskBudget) });
 
-  const session = new AgentSession(store, userId, agentId, taskBudget, emit);
+  const network = parseTaskNetwork(message);
+  if (network) emit({ type: 'status', message: `Paying on ${NETWORKS[network].label} only` });
+
+  const session = new AgentSession(store, userId, agentId, taskBudget, network, emit);
   await store.appendActivity({ userId, transactionId: null, eventType: 'agent_run', eventData: { taskId: session.taskId } });
 
   try {

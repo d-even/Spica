@@ -6,7 +6,7 @@ import { createSiweMessage, generateSiweNonce, parseSiweMessage, validateSiweMes
 const CHALLENGE_TTL_MS = 5 * 60_000;
 const STATEMENT = 'Sign in to PayGate. This does not send a transaction or cost anything.';
 
-export type TokenPurpose = 'session' | 'challenge';
+export type TokenPurpose = 'session' | 'challenge' | 'api_key';
 
 const mac = (purpose: TokenPurpose, body: string, secret: string) =>
   createHmac('sha256', secret).update(`${purpose}.${body}`).digest();

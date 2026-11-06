@@ -3,7 +3,7 @@ import { usdToMicros } from '@/lib/money';
 import { NETWORKS } from '@/lib/networks';
 import { DEFAULT_POLICY, evaluatePolicy, type PaymentRequest, type SpendingPolicy, type SpendState } from '@/server/firewall/policy';
 import { MemoryStore } from '@/server/store/memory';
-import { parseTaskBudget } from '@/server/agent/budget';
+import { parseTaskBudget, parseTaskNetwork } from '@/server/agent/budget';
 
 const policy: SpendingPolicy = {
   ...DEFAULT_POLICY,
@@ -91,10 +91,6 @@ describe('policy decisions', () => {
 
   it('refuses a quote above the listed price', () => {
     expect(code(evaluate(request('0.05', { listedAmountMicros: usdToMicros('0.02') })))).toBe('price_changed');
-  });
-
-  it('refuses a provider whose ENS name points elsewhere', () => {
-    expect(code(evaluate(request('0.02', { identityStatus: 'mismatch' })))).toBe('identity_mismatch');
   });
 
   it('refuses zero and negative amounts', () => {
@@ -246,5 +242,21 @@ describe('task budget parsing', () => {
   it('ignores prices that are not budgets', () => {
     expect(parseTaskBudget('What is the price of a $5 coffee?')).toBeUndefined();
     expect(parseTaskBudget('Find cricket scores')).toBeUndefined();
+  });
+
+  it.each([
+    ['a weather API for $0.03', '0.03'],
+    ['a weather API at 0.04 usdc', '0.04'],
+    ['weather API, budget 0.05', '0.05'],
+    ['a weather API at a cost of $0.02', '0.02'],
+  ])('reads the cost in %s', (message, amount) => {
+    expect(parseTaskBudget(message)).toBe(usdToMicros(amount));
+  });
+
+  it('reads a named network, and leaves it open otherwise', () => {
+    expect(parseTaskNetwork('pay on Hedera')).toBe('hedera-testnet');
+    expect(parseTaskNetwork('pay on arc')).toBe('arc-testnet');
+    expect(parseTaskNetwork('either arc or hedera')).toBeUndefined();
+    expect(parseTaskNetwork('search for architecture news')).toBeUndefined();
   });
 });

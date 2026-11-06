@@ -37,9 +37,7 @@ Not built yet:
 - The other five agent tools, and provider comparison
 - Audit events for rejections, mirror-node verification and an audit dashboard
 - Provider and agent SDKs
-- Landing page rewrite and the remaining API routes
-
-ENS and the Sepolia subdomain code are still in the app, and are due to move to `/legacy`.
+- The remaining API routes
 
 ## Steps so far
 
@@ -58,9 +56,9 @@ Next is Phase 1, a real Hedera x402 payment, once the setup steps below are done
 - **Spending Firewall:** per-request, daily, monthly and per-task limits, provider allowlist and blocklist, network permissions, an approval threshold, and an automatic-payment switch.
 - **Discovery:** the live Circle Agent Marketplace, plus services registered on PayGate.
 - **Payments:** Arc USDC through Circle Gateway nanopayments, and Hedera USDC through an x402 facilitator, behind one adapter interface.
-- **Provider identity:** ENS names are checked against the payment address. A mismatch blocks payment.
 - **Reputation:** measured from real calls only. Below five calls it says "Not enough data".
 - **Receipts and audit:** every payment gets a receipt, with optional Hedera Consensus Service publishing.
+- **Built-in APIs:** weather, news, stock quotes and cricket, resold per call. Their upstream keys stay on the server, and a buyer gets a PayGate key.
 - **Provider dashboard:** register an API, set a price, and see revenue, failures and reputation.
 
 ## Architecture
@@ -74,7 +72,6 @@ flowchart TD
     A -->|purchase by service ID only| P[Purchase orchestrator]
     P -->|unpaid request| S[Seller]
     S -->|402 and terms| P
-    P --> E[ENS identity check]
     P --> F[Policy engine]
     F -->|needs approval| H[Person approves]
     F -->|allowed| R[Atomic reservation]
@@ -102,7 +99,7 @@ flowchart TD
 
 1. The agent names a service it discovered in this run. It cannot supply a URL, price or recipient.
 2. PayGate requests the resource unpaid and reads the seller's real `402` terms.
-3. It chooses the cheapest offer on an enabled network and checks provider identity.
+3. It chooses the cheapest offer on a network that is enabled and allowed.
 4. The policy engine decides: allow, needs approval, or deny.
 5. An atomic reservation re-checks budgets and duplicates. This stops concurrent requests overspending.
 6. The signer moves that reservation from held to signing exactly once, for that exact requirement, and signs.
@@ -181,7 +178,7 @@ Base has been removed.
 
 ## API
 
-All routes except `/api/x402/*` and `/api/auth/*` need a signed-in session. Identity always comes from the session, never the request body.
+All routes except `/api/x402/*`, `/api/v1/*` and `/api/auth/*` need a signed-in session. Identity always comes from the session, never the request body.
 
 | Route | Purpose |
 | --- | --- |
@@ -192,9 +189,10 @@ All routes except `/api/x402/*` and `/api/auth/*` need a signed-in session. Iden
 | `GET /api/transactions/:id` | Read a receipt |
 | `GET /api/marketplace` | Search the catalog: `query`, `category`, `network`, `offset` |
 | `GET`, `PUT /api/provider` | Provider profile, sales and reputation |
-| `POST /api/provider/services` | Register an API |
+| `POST /api/provider/services` | Register an API, with optional code released after payment |
 | `DELETE /api/provider/services/:id` | Remove your API |
 | `GET /api/x402/:serviceId` | A paid resource, using x402 v2 |
+| `GET /api/v1/:serviceId` | The developer API. Send the key from a purchase as `Authorization: Bearer <key>`. Each call pays through the firewall, and query parameters reach the provider |
 | `POST /api/auth/challenge`, `/verify`, `/logout` | Wallet sign-in |
 
 ## Using the middleware
@@ -216,8 +214,8 @@ Write a `SellerAdapter` to add a network. The middleware only knows the protocol
 | --- | --- |
 | `npm test` | Policy engine, reservations, approvals, middleware, reputation, URL guard |
 | `npm run test:e2e -- <url>` | The full journey against a running server in demo mode |
-| `npm run test:live` | Real Arc, Gateway, ENS and Hedera, with throwaway unfunded keys. It cannot spend |
-| `npm run test:mutation` | Breaks 20 protections one at a time and confirms the tests notice |
+| `npm run test:live` | Real Arc, Gateway and Hedera, with throwaway unfunded keys. It cannot spend |
+| `npm run test:mutation` | Breaks 19 protections one at a time and confirms the tests notice |
 
 ## Security
 
@@ -236,6 +234,5 @@ Write a `SellerAdapter` to add a network. The middleware only knows the protocol
 - The signer is a module boundary, not a separate process. For production, move it to its own service or a KMS.
 - Rate limiting is per server instance. Budgets do not depend on it.
 - Unverified payments stay counted, and there is no reconciliation screen yet.
-- ENS shows identity only. It says nothing about the quality of an API.
 - Reputation is computed from calls made through this PayGate deployment.
 - Provider revenue counts sales reported by PayGate's seller route.
