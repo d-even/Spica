@@ -63,6 +63,14 @@ export function parsePaymentRequired(headers: Headers, body: string): PaymentReq
   }
 }
 
+/**
+ * Networks a purchase may use: enabled on this server and allowed by the person.
+ * The demo rail is exempt from the person's list, as in the policy engine.
+ */
+export function payableNetworks(active: NetworkId[], allowed: NetworkId[]): NetworkId[] {
+  return active.filter((network) => network === 'demo' || allowed.includes(network));
+}
+
 /** Cheapest offer this deployment can pay. Network filtering happens before the firewall sees it. */
 export function selectRequirement(paymentRequired: PaymentRequired, networks: NetworkId[]) {
   const payable = paymentRequired.accepts.flatMap((requirement) => {
@@ -122,10 +130,16 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
     await observe({ reachable: true, succeeded: false, paid: false });
     return { outcome: 'failed', reason: 'The service sent payment terms PayGate could not read.' };
   }
-  const selected = selectRequirement(paymentRequired, activeNetworks());
+  // Choose among networks the person allows, so a cheaper offer on a network they
+  // turned off does not hide one they would accept.
+  const policy = await store.getPolicy(userId);
+  const selected = selectRequirement(paymentRequired, payableNetworks(activeNetworks(), policy.allowedNetworks));
   if (!selected) {
     await observe({ reachable: true, succeeded: false, paid: false });
-    return { outcome: 'denied', code: 'network_not_allowed', reason: 'The service does not accept any network enabled here.' };
+    const reason = selectRequirement(paymentRequired, activeNetworks())
+      ? 'The service only accepts networks you have not allowed.'
+      : 'The service does not accept any network enabled here.';
+    return { outcome: 'denied', code: 'network_not_allowed', reason };
   }
   const { requirement, network } = selected;
   const amountMicros = BigInt(requirement.amount);
@@ -143,7 +157,6 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
     listedAmountMicros: listed === undefined ? undefined : BigInt(listed),
     taskBudgetMicros: context.taskBudgetMicros,
   };
-  const policy = await store.getPolicy(userId);
   const decision = evaluatePolicy(policy, paymentRequest, await store.getSpendState(userId, taskId), {
     mainnetEnabled: mainnetEnabled(),
     humanApproved,
