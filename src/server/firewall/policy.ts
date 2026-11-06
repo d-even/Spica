@@ -45,6 +45,12 @@ export interface PaymentRequest {
   listedAmountMicros?: bigint;
   /** Budget the person stated for this task, if any. */
   taskBudgetMicros?: bigint;
+  /**
+   * Result of checking a provider's claimed identity against the payment
+   * address. No identity source is wired in today (ENS was retired); kept for a
+   * future one such as Hedera HCS-14.
+   */
+  identityStatus?: 'match' | 'mismatch' | 'none';
 }
 
 export interface SpendState {
@@ -57,9 +63,9 @@ export type DenyCode =
   | 'invalid_amount'
   | 'unsupported_asset'
   | 'network_not_allowed'
-  | 'mainnet_disabled'
   | 'provider_blocked'
   | 'provider_not_allowlisted'
+  | 'identity_mismatch'
   | 'price_changed'
   | 'per_request_limit'
   | 'task_budget'
@@ -72,7 +78,6 @@ export type PolicyDecision =
   | { outcome: 'deny'; code: DenyCode; reason: string };
 
 export interface EvaluateOptions {
-  mainnetEnabled: boolean;
   /** A person approved this exact quote. Waives approval only, never a hard limit. */
   humanApproved?: boolean;
 }
@@ -83,7 +88,7 @@ export function evaluatePolicy(
   policy: SpendingPolicy,
   request: PaymentRequest,
   spend: SpendState,
-  options: EvaluateOptions,
+  options: EvaluateOptions = {},
 ): PolicyDecision {
   const { amountMicros: amount, network: networkId, providerKey } = request;
   const network = NETWORKS[networkId];
@@ -91,9 +96,6 @@ export function evaluatePolicy(
   if (amount <= 0n) return deny('invalid_amount', 'The quoted amount is not a positive value.');
   if (!network || request.asset.toLowerCase() !== network.tokenAsset.toLowerCase()) {
     return deny('unsupported_asset', 'Only USDC on the selected network can be paid.');
-  }
-  if (network.mainnet && !options.mainnetEnabled) {
-    return deny('mainnet_disabled', `${network.label} moves real money and is disabled on this server.`);
   }
   if (networkId !== 'demo' && !policy.allowedNetworks.includes(networkId)) {
     return deny('network_not_allowed', `${network.label} is not an allowed network.`);
@@ -103,6 +105,9 @@ export function evaluatePolicy(
   }
   if (policy.allowedProviders.length > 0 && !policy.allowedProviders.includes(providerKey)) {
     return deny('provider_not_allowlisted', 'This provider is not on your allowlist.');
+  }
+  if (request.identityStatus === 'mismatch') {
+    return deny('identity_mismatch', "The provider's verified identity does not match the payment address.");
   }
   if (request.listedAmountMicros !== undefined && amount > request.listedAmountMicros) {
     return deny(

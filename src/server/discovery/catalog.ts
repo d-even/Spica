@@ -1,86 +1,11 @@
 import 'server-only';
-import { microsToUsd, usdToMicros } from '@/lib/money';
+import { microsToUsd } from '@/lib/money';
 import { NETWORKS, type NetworkId } from '@/lib/networks';
-import { activeNetworks, mode, publicUrl } from '@/server/env';
-import { feedKeyName, isFeedId } from '@/server/feeds';
+import { activeNetworks, circleCatalogEnabled, mode, publicUrl } from '@/server/env';
 import { getStore } from '@/server/store';
 import type { ServiceRecord } from '@/server/store/types';
-import { discover } from './circle';
+import { discover, recentlyDiscovered } from './circle';
 import type { CatalogService } from './types';
-
-/**
- * Services PayGate sells itself. The Circle catalog has no cricket API, so the
- * end-to-end journey runs against these real x402 endpoints.
- */
-const BUILTIN: { id: string; name: string; description: string; priceMicros: string; input?: Record<string, string> }[] = [
-  {
-    id: 'weather-live',
-    name: 'Weather Forecast',
-    description: 'Current weather and a 3-day forecast for any city.',
-    priceMicros: '10000',
-    input: { q: 'City name, for example Pune' },
-  },
-  {
-    id: 'news-live',
-    name: 'News Headlines',
-    description: 'Top news headlines, or news articles about any topic.',
-    priceMicros: '20000',
-    input: { q: 'Optional topic, for example bitcoin' },
-  },
-  {
-    id: 'finance-quote',
-    name: 'Stock Quotes',
-    description: 'Finance data: the latest stock market price for a ticker symbol.',
-    priceMicros: '10000',
-    input: { symbol: 'Ticker symbol, for example IBM' },
-  },
-  {
-    id: 'cricket-live',
-    name: 'Cricket Live Scores',
-    description: 'Current cricket matches with scores and match status.',
-    priceMicros: '20000',
-  },
-];
-
-export const isBuiltinId = (id: string) => BUILTIN.some((service) => service.id === id);
-
-/** Where a built-in service gets paid on one network, if it can be paid there at all. */
-export function builtinPayTo(network: NetworkId): string | null {
-  if (network === 'demo') return 'demo-provider';
-  const family = NETWORKS[network].family;
-  if (family === 'arc') return process.env.PAYGATE_SELLER_ADDRESS ?? null;
-  if (family === 'hedera') return process.env.HEDERA_SELLER_ACCOUNT_ID ?? null;
-  return null;
-}
-
-export function builtinServices(): CatalogService[] {
-  const networks = activeNetworks().filter((network) => builtinPayTo(network));
-  // A resold API with no key on this server cannot deliver, so it is not listed.
-  const available = BUILTIN.filter((service) => !isFeedId(service.id) || process.env[feedKeyName(service.id)]);
-  return available.map((service) => ({
-    id: service.id,
-    source: 'builtin' as const,
-    name: service.name,
-    description: service.description,
-    category: 'SPORTS',
-    providerName: mode() === 'demo' ? 'PayGate Demo Provider' : 'PayGate',
-    providerKey: 'paygate:builtin',
-    endpoint: `${publicUrl()}/api/x402/${service.id}`,
-    method: 'GET',
-    offers: networks.map((network) => ({
-      network,
-      amountMicros: service.priceMicros,
-      payTo: builtinPayTo(network)!,
-      asset: NETWORKS[network].tokenAsset,
-    })),
-    listedMicros: service.priceMicros,
-    listedUsd: microsToUsd(service.priceMicros),
-    allNetworks: networks.map((network) => NETWORKS[network].caip2),
-    inputSchema: service.input ?? null,
-    purchasable: networks.length > 0,
-    supportsGateway: false,
-  }));
-}
 
 export async function registeredToCatalog(service: ServiceRecord): Promise<CatalogService | null> {
   const provider = await getStore().getProvider(service.providerId);
@@ -110,8 +35,43 @@ export async function registeredToCatalog(service: ServiceRecord): Promise<Catal
     allNetworks: service.supportedNetworks.map((network) => NETWORKS[network].caip2),
     inputSchema: null,
     purchasable: offers.length > 0,
-    supportsGateway: false,
+    // Arc payments settle through Circle Gateway.
+    supportsGateway: offers.some((offer) => NETWORKS[offer.network].family === 'arc'),
   };
+}
+
+/** Every API providers have listed. This is the marketplace. */
+export async function localServices(): Promise<CatalogService[]> {
+  const services = await getStore().listServices({ enabledOnly: true });
+  const entries = await Promise.all(services.map(registeredToCatalog));
+  return entries.filter((entry) => entry !== null);
+}
+
+/** The same filters Circle discovery applies, for SPICA's own listings. */
+export function filterLocal(
+  services: CatalogService[],
+  input: { query?: string; category?: string; maxUsdPrice?: string; network?: NetworkId },
+) {
+  const cap = input.maxUsdPrice ? Number(input.maxUsdPrice) : null;
+  return services.filter(
+    (service) =>
+      (!input.query || matches(service, input.query)) &&
+      (!input.category || service.category.toUpperCase() === input.category.toUpperCase()) &&
+      (cap === null || (service.listedUsd !== null && Number(service.listedUsd) <= cap)) &&
+      (!input.network || service.offers.some((offer) => offer.network === input.network)),
+  );
+}
+
+/**
+ * Finds a service a person picked in the marketplace. SPICA listings are read
+ * fresh from the store; Circle listings must have been seen by this server recently.
+ */
+export async function resolveService(id: string): Promise<CatalogService | null> {
+  if (!id.startsWith('cat_')) {
+    const record = await getStore().getService(id).catch(() => null);
+    return record?.enabled ? registeredToCatalog(record) : null;
+  }
+  return recentlyDiscovered(id);
 }
 
 const matches = (service: CatalogService, query: string) =>
@@ -121,25 +81,12 @@ const matches = (service: CatalogService, query: string) =>
     .filter(Boolean)
     .some((word) => `${service.name} ${service.description} ${service.category}`.toLowerCase().includes(word));
 
-/** Built-in and provider-registered services. The agent and the marketplace both read this. */
-export async function localServices(query?: string) {
-  const local = [...builtinServices()];
-  const registered = await getStore().listServices({ enabledOnly: true });
-  for (const service of registered) {
-    const entry = await registeredToCatalog(service);
-    if (entry) local.push(entry);
-  }
-  return query ? local.filter((service) => matches(service, query)) : local;
-}
-
-/** PayGate services first, then the Circle catalog filtered to payable networks. */
+/** Provider listings, then the Circle catalog when it is switched on. */
 export async function findServices(input: { query: string; category?: string; maxUsdPrice?: string; limit?: number }) {
-  const local = await localServices(input.query);
-  const relevant = input.maxUsdPrice
-    ? local.filter((service) => service.listedMicros !== null && BigInt(service.listedMicros) <= usdToMicros(input.maxUsdPrice!))
-    : local;
+  const local = await localServices();
+  const relevant = filterLocal(local, { query: input.query || undefined, maxUsdPrice: input.maxUsdPrice });
 
-  const live = activeNetworks().filter((network) => network !== 'demo');
+  const live = circleCatalogEnabled() ? activeNetworks().filter((network) => network !== 'demo') : [];
   const pages = await Promise.allSettled(
     live.map((network) => discover({ ...input, network, limit: input.limit ?? 10 })),
   );

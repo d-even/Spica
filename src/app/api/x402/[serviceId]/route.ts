@@ -1,9 +1,7 @@
-import { connection, NextResponse } from 'next/server';
+import { connection } from 'next/server';
 import { withPayment } from 'paygate-x402';
 import { encodeUsageCode, USAGE_CODE_HEADER } from '@/lib/usage-code';
-import { loadCricketFeed } from '@/server/cricket';
-import { isFeedId, loadFeed } from '@/server/feeds';
-import { builtinServices, isBuiltinId, registeredToCatalog } from '@/server/discovery/catalog';
+import { registeredToCatalog } from '@/server/discovery/catalog';
 import type { CatalogService } from '@/server/discovery/types';
 import { apiError } from '@/server/http/api';
 import { assertPublicUrl, safeFetch } from '@/server/http/guard';
@@ -14,18 +12,14 @@ import { getStore } from '@/server/store';
 
 interface ResolvedService {
   service: CatalogService;
-  /** The provider's real API. Null for built-in services. */
-  upstream: string | null;
+  /** The provider's real API. */
+  upstream: string;
   ownerUserId: string | null;
   usageCode: string | null;
   credential: ServiceCredential | null;
 }
 
 async function resolve(serviceId: string): Promise<ResolvedService | null> {
-  if (isBuiltinId(serviceId)) {
-    const service = builtinServices().find((item) => item.id === serviceId);
-    return service ? { service, upstream: null, ownerUserId: null, usageCode: null, credential: null } : null;
-  }
   const store = getStore();
   const record = await store.getService(serviceId).catch(() => null);
   if (!record?.enabled) return null;
@@ -38,11 +32,7 @@ async function resolve(serviceId: string): Promise<ResolvedService | null> {
 }
 
 /** Data is produced before settlement, so a failure here charges nobody. */
-async function deliver(serviceId: string, upstream: string | null, usageCode: string | null, credential: ServiceCredential | null, query: URLSearchParams): Promise<Response> {
-  if (upstream === null) {
-    const feed = isFeedId(serviceId) ? await loadFeed(serviceId, query) : await loadCricketFeed();
-    return feed ? NextResponse.json(feed) : NextResponse.json({ error: 'This data is unavailable right now.' }, { status: 503 });
-  }
+async function deliver(upstream: string, usageCode: string | null, credential: ServiceCredential | null, query: URLSearchParams): Promise<Response> {
   const url = await assertPublicUrl(upstream);
   for (const [key, value] of query) url.searchParams.set(key, value);
   const headers: Record<string, string> = { accept: 'application/json' };
@@ -71,7 +61,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ serv
     const { service, upstream, ownerUserId, usageCode, credential } = resolved;
     const store = getStore();
 
-    const handler = withPayment(() => deliver(serviceId, upstream, usageCode, credential, new URL(request.url).searchParams), {
+    const handler = withPayment(() => deliver(upstream, usageCode, credential, new URL(request.url).searchParams), {
       offers: service.offers.map((offer) => ({
         adapter: getAdapter(offer.network),
         amountAtomic: offer.amountMicros,

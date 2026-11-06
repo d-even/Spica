@@ -1,13 +1,14 @@
 import { isAddress } from 'viem';
 import { z } from 'zod';
-import { authed, toJson } from '@/server/http/api';
+import { isAgentWallet } from '@/server/env';
+import { apiError, authed, toJson } from '@/server/http/api';
 import { computeReputation } from '@/server/reputation';
 import { getStore } from '@/server/store';
 
 const body = z.object({
   name: z.string().trim().min(2, 'Enter a provider name.').max(80),
-  walletAddress: z.string().refine((value) => isAddress(value), 'Enter a valid wallet address.'),
-  hederaAccount: z.string().regex(/^\d+\.\d+\.\d+$/, 'Use the form 0.0.1234.').optional().or(z.literal('')),
+  walletAddress: z.string().trim().refine((value) => isAddress(value), 'Connect a wallet or enter a valid 0x address.'),
+  hederaAccount: z.string().trim().regex(/^\d+\.\d+\.\d+$/, 'Use the form 0.0.1234.').optional().or(z.literal('')),
 });
 
 export const GET = authed(async (user) => {
@@ -26,8 +27,13 @@ export const GET = authed(async (user) => {
   return toJson({ provider, services: withReputation, sales });
 });
 
+/**
+ * Saves the provider profile. Arc payments go to the connected wallet and
+ * Hedera payments to the Hedera account. No name service is involved.
+ */
 export const PUT = authed(async (user, request) => {
   const input = body.parse(await request.json());
+  if (isAgentWallet(input.walletAddress)) return apiError('That wallet pays for agent purchases, so it cannot receive them. Use a different wallet.', 400);
   const provider = await getStore().saveProvider({
     ownerUserId: user.id,
     name: input.name,

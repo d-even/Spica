@@ -3,7 +3,7 @@ import { createCipheriv, createDecipheriv, createHmac, randomBytes } from 'node:
 
 export type KeyPlacement = 'bearer' | 'header' | 'query';
 
-/** How PayGate authenticates to a provider's API. The key inside is encrypted. */
+/** How SPICA authenticates to a provider's API. The key inside is encrypted. */
 export interface ServiceCredential {
   sealedKey: string;
   placement: KeyPlacement;

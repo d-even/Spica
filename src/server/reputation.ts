@@ -26,7 +26,7 @@ export function latencyScore(averageMs: number) {
 }
 
 /**
- * Derives a score from PayGate's own measurements only. There is no self-reported
+ * Derives a score from SPICA's own measurements only. There is no self-reported
  * input and no default: below MIN_OBSERVATIONS the result is "not enough data".
  * Measures without data are excluded, and the remaining weights rescale.
  */

@@ -1,27 +1,80 @@
 'use client';
 
-import { stringToHex } from 'viem';
+import { createWalletClient, custom, type EIP1193Provider } from 'viem';
+import { arcTestnet } from 'viem/chains';
+import { createSiweMessage } from 'viem/siwe';
 import { api } from './api';
 
-interface WalletProvider {
-  request(args: { method: string; params?: unknown[] }): Promise<unknown>;
+declare global {
+  interface Window {
+    ethereum?: EIP1193Provider;
+  }
 }
 
-const REJECTED_BY_USER = 4001;
+/** A message that is safe to show as is. */
+export class WalletError extends Error {}
 
-/** Proves ownership with a free signature. It sends no transaction. */
-export async function signInWithWallet() {
-  const wallet = (window as Window & { ethereum?: WalletProvider }).ethereum;
-  if (!wallet) throw new Error('No wallet found. Install a browser wallet such as MetaMask, then reload this page.');
+const USER_REJECTED = 4001;
+const SIGN_IN_TTL_MS = 10 * 60_000;
 
-  const [address] = (await wallet.request({ method: 'eth_requestAccounts' })) as string[];
-  const chainId = Number(await wallet.request({ method: 'eth_chainId' }));
-  const { message } = await api<{ message: string }>('/api/auth/challenge', {
-    method: 'POST',
-    body: JSON.stringify({ address, chainId }),
+/** viem wraps provider errors, so look down the cause chain for the EIP-1193 code. */
+function providerCode(error: unknown): number | undefined {
+  let current = error as { code?: unknown; cause?: unknown } | undefined;
+  while (current) {
+    if (typeof current.code === 'number') return current.code;
+    current = current.cause as typeof current;
+  }
+  return undefined;
+}
+
+export function walletErrorMessage(error: unknown): string {
+  if (error instanceof WalletError) return error.message;
+  if (providerCode(error) === USER_REJECTED) return 'You cancelled the request in your wallet.';
+  const viemError = error as { shortMessage?: string; message?: string };
+  return viemError.shortMessage ?? viemError.message ?? 'Something went wrong.';
+}
+
+/**
+ * Sign-In with Ethereum on Arc Testnet: connect, switch (adding Arc Testnet to
+ * the wallet if it is missing), then sign a message carrying a server nonce.
+ * Signing is free and sends no transaction.
+ */
+export async function signInWithArc(): Promise<string> {
+  const provider = window.ethereum;
+  if (!provider) throw new WalletError('No browser wallet found. Install MetaMask, Rabby or another wallet, then try again.');
+  const wallet = createWalletClient({ chain: arcTestnet, transport: custom(provider) });
+
+  const [address] = await wallet.requestAddresses();
+  if (!address) throw new WalletError('Your wallet did not share an account.');
+
+  if ((await wallet.getChainId()) !== arcTestnet.id) {
+    try {
+      await wallet.switchChain({ id: arcTestnet.id });
+    } catch (error) {
+      if (providerCode(error) === USER_REJECTED) throw error;
+      // Most wallets answer 4902 for an unknown chain; some use other codes, so add it either way.
+      await wallet.addChain({ chain: arcTestnet });
+      if ((await wallet.getChainId()) !== arcTestnet.id) await wallet.switchChain({ id: arcTestnet.id });
+    }
+  }
+
+  const { nonce } = await api<{ nonce: string }>('/api/auth/nonce', { method: 'POST' });
+  const issuedAt = new Date();
+  const message = createSiweMessage({
+    address,
+    chainId: arcTestnet.id,
+    domain: window.location.host,
+    uri: window.location.origin,
+    version: '1',
+    nonce,
+    statement: 'Sign in to SPICA. This is free and does not send a transaction.',
+    issuedAt,
+    expirationTime: new Date(issuedAt.getTime() + SIGN_IN_TTL_MS),
   });
-  const signature = await wallet.request({ method: 'personal_sign', params: [stringToHex(message), address] });
-  await api('/api/auth/verify', { method: 'POST', body: JSON.stringify({ message, signature }) });
+  const signature = await wallet.signMessage({ account: address, message });
+
+  await api('/api/auth/wallet', { method: 'POST', body: JSON.stringify({ chain: 'arc-testnet', message, signature }) });
+  return address;
 }
 
 /**
@@ -29,8 +82,3 @@ export async function signInWithWallet() {
  * a page keeps the signed-out state it had, or one wallet's data after sign-out.
  */
 export const openFresh = (path: string) => window.location.assign(path);
-
-export function walletErrorMessage(cause: unknown) {
-  const { code, message } = cause as { code?: number; message: string };
-  return code === REJECTED_BY_USER ? 'The request was cancelled in your wallet.' : message;
-}

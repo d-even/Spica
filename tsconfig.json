@@ -41,6 +41,7 @@
   ],
   "exclude": [
     "node_modules",
+    "legacy",
     "paygate-x402/dist",
     "vitest.config.mts",
     "vitest.live.config.mts"

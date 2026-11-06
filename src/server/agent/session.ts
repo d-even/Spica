@@ -15,7 +15,7 @@ export type AgentEvent =
   | { type: 'selected'; service: ServiceSummary }
   | { type: 'approval_required'; approvalId: string; service: string; amount: string; reason: string }
   | { type: 'data'; service: string; data: string }
-  | { type: 'answer'; text: string; source: 'gemini' | 'demo' }
+  | { type: 'answer'; text: string; source: 'claude' | 'gemini' | 'demo' }
   | { type: 'error'; message: string }
   | PurchaseEvent;
 
@@ -90,6 +90,7 @@ export class AgentSession {
       description: service.description,
       method: service.method,
       input_schema: service.inputSchema,
+      pays_to: service.offers.map((offer) => `${offer.payTo} (${offer.network})`),
       reputation:
         reputation.status === 'scored'
           ? { score: reputation.score, sample_size: reputation.sampleSize }

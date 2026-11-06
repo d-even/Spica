@@ -108,6 +108,28 @@ export function toCatalogService(raw: unknown): CatalogService | null {
 
 const cache = new Map<string, { at: number; page: DiscoveryPage }>();
 
+/**
+ * Listings seen recently, by id, so a person can buy one they saw in the
+ * marketplace. The server keeps what Circle returned; the browser only names an id.
+ */
+const seen = new Map<string, { at: number; service: CatalogService }>();
+const SEEN_TTL_MS = 30 * 60_000;
+const SEEN_MAX = 2_000;
+
+function remember(services: CatalogService[]) {
+  const now = Date.now();
+  for (const service of services) {
+    seen.delete(service.id);
+    seen.set(service.id, { at: now, service });
+  }
+  while (seen.size > SEEN_MAX) seen.delete(seen.keys().next().value!);
+}
+
+export function recentlyDiscovered(id: string): CatalogService | null {
+  const hit = seen.get(id);
+  return hit && Date.now() - hit.at < SEEN_TTL_MS ? hit.service : null;
+}
+
 export async function discover(query: DiscoveryQuery): Promise<DiscoveryPage> {
   const params = new URLSearchParams({ type: 'http', limit: String(Math.min(query.limit ?? 24, 200)), offset: String(query.offset ?? 0) });
   if (query.query) params.set('query', query.query);
@@ -117,7 +139,10 @@ export async function discover(query: DiscoveryQuery): Promise<DiscoveryPage> {
 
   const key = params.toString();
   const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.page;
+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
+    remember(hit.page.services);
+    return hit.page;
+  }
 
   const response = await fetch(`${DISCOVERY_URL}?${key}`, {
     signal: AbortSignal.timeout(15_000),
@@ -129,5 +154,6 @@ export async function discover(query: DiscoveryQuery): Promise<DiscoveryPage> {
   const services = body.items.flatMap((item) => toCatalogService(item) ?? []);
   const result = { services, total: body.pagination?.total ?? services.length };
   cache.set(key, { at: Date.now(), page: result });
+  remember(services);
   return result;
 }

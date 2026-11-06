@@ -15,9 +15,7 @@ export interface PaymentProof {
 
 const EXPLORER: Partial<Record<NetworkId, string>> = {
   'arc-testnet': 'Arc Explorer',
-  'arc-mainnet': 'Arc Explorer',
   'hedera-testnet': 'HashScan',
-  'hedera-mainnet': 'HashScan',
 };
 
 /** Null until the payment is final. While settling, the reference is a Gateway ID no explorer knows. */
@@ -29,7 +27,7 @@ export function settlementProof(transaction: { network: NetworkId; status: strin
 }
 
 /** A Hedera Consensus Service message that records this payment. */
-export const auditProof = (status: string, sequence: string, transactionId: string, mainnet = false): ProofLink => ({
+export const auditProof = (status: string, sequence: string, transactionId: string): ProofLink => ({
   label: `Audit #${sequence} on HashScan (${status})`,
-  url: hashscanTransaction(transactionId, mainnet),
+  url: hashscanTransaction(transactionId),
 });

@@ -1,7 +1,7 @@
 import { ApiError } from '@google/genai';
 import { describe, expect, it, vi } from 'vitest';
 
-import { generateWithFallback } from '@/server/agent/claude';
+import { generateWithFallback } from '@/server/agent/fallback';
 
 const failure = (status: number) => new ApiError({ status, message: `failed with ${status}` });
 const models = ['first', 'second', 'third'];

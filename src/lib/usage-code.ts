@@ -20,7 +20,7 @@ export function decodeUsageCode(header: string | null): string | null {
   return code.trim() && isValidUsageCode(code) ? code : null;
 }
 
-/** Runs as it is: the key stands in for a wallet, and PayGate pays on each call. */
+/** Runs as it is: the key stands in for a wallet, and SPICA pays on each call. */
 export const developerApiCode = (url: string, apiKey: string) =>
   [
     `const res = await fetch(${JSON.stringify(url)}, { headers: { Authorization: "Bearer ${apiKey}" } });`,
@@ -28,7 +28,7 @@ export const developerApiCode = (url: string, apiKey: string) =>
     `console.log(data);`,
   ].join('\n');
 
-/** For catalog services PayGate does not sell. Each call needs a new x402 payment proof. */
+/** For catalog services SPICA does not sell. Each call needs a new x402 payment proof. */
 export const defaultUsageCode = (url: string) =>
   [
     `const unpaid = await fetch(${JSON.stringify(url)}); // 402 with the price`,

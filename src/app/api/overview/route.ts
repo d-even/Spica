@@ -1,4 +1,4 @@
-import { integrations, mainnetEnabled, mode, activeNetworks } from '@/server/env';
+import { integrations, mode, activeNetworks } from '@/server/env';
 import { authed, toJson } from '@/server/http/api';
 import { refreshTransactions } from '@/server/settlement';
 import { getStore } from '@/server/store';
@@ -15,9 +15,8 @@ export const GET = authed(async (user) => {
   ]);
   const current = await refreshTransactions(store, transactions);
   return toJson({
-    user: { wallet: user.wallet, demo: user.demo },
+    user: { address: user.address, chain: user.chain, demo: user.demo },
     mode: mode(),
-    mainnetEnabled: mainnetEnabled(),
     store: store.kind,
     networks: activeNetworks(),
     integrations: integrations(),

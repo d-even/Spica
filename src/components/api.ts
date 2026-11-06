@@ -28,6 +28,7 @@ export function useRefreshWhile(active: boolean, reload: () => unknown) {
 export function useApi<T>(path: string | null) {
   const [data, setData] = useState<T>();
   const [error, setError] = useState<string>();
+  const [loadedPath, setLoadedPath] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     if (!path) return;
@@ -46,6 +47,7 @@ export function useApi<T>(path: string | null) {
         .then((value) => {
           if (active) {
             setData(value);
+            setLoadedPath(path);
             setError(undefined);
           }
         })
@@ -58,7 +60,8 @@ export function useApi<T>(path: string | null) {
     };
   }, [path]);
 
-  return { data, error, reload };
+  // Stale: showing the previous answer while a new one loads.
+  return { data, error, reload, stale: data !== undefined && loadedPath !== path && !error };
 }
 
 /** Money fields arrive as strings of micro-USD. */
@@ -113,9 +116,8 @@ export interface IntegrationDto {
 }
 
 export interface OverviewDto {
-  user: { wallet: string | null; demo: boolean };
+  user: { address: string | null; chain: string | null; demo: boolean };
   mode: 'demo' | 'live';
-  mainnetEnabled: boolean;
   store: 'memory' | 'supabase';
   networks: NetworkId[];
   integrations: IntegrationDto[];

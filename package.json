@@ -11,11 +11,13 @@
     "typecheck": "tsc --noEmit",
     "wallet:status": "tsx scripts/agent-wallet.mts status",
     "wallet:deposit": "tsx scripts/agent-wallet.mts deposit",
+    "payments:settle": "tsx --conditions=react-server scripts/settle-pending.mts",
     "test:live": "tsx scripts/live-check.mts && vitest run --config vitest.live.config.mts",
     "test:e2e": "node scripts/e2e-demo.mjs",
     "test:mutation": "node scripts/mutation-check.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
     "@circle-fin/x402-batching": "^4.0.0",
     "@google/genai": "^2.32.0",
     "@hashgraph/sdk": "^2.81.0",

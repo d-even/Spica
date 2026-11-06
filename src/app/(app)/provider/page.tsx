@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useCallback, useState, type FormEvent } from 'react';
 import { api, useApi, type ReputationDto } from '@/components/api';
 import { BarChart, lastSevenDays } from '@/components/bar-chart';
+import { ConnectWallet } from '@/components/connect-wallet';
 import { Button, Card, Empty, ErrorNote, Field, Input, Loading, PageHeader, Select, Stat, Textarea } from '@/components/ui';
+import { CATEGORY_LIST } from '@/components/marketplace/meta';
 import { formatUsd } from '@/lib/money';
 import { NETWORKS, SELECTABLE_NETWORKS, type NetworkId } from '@/lib/networks';
 
@@ -46,6 +48,10 @@ function ProfileForm({ provider, onSaved }: { provider: ProviderDto | null; onSa
   });
   const [error, setError] = useState<string>();
   const [saved, setSaved] = useState(false);
+  const setWallet = useCallback((walletAddress: string) => {
+    setForm((current) => ({ ...current, walletAddress }));
+    setSaved(false);
+  }, []);
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -71,8 +77,13 @@ function ProfileForm({ provider, onSaved }: { provider: ProviderDto | null; onSa
     <Card title="Provider profile">
       <form onSubmit={save} className="grid gap-4 sm:grid-cols-2">
         <Field label="Name"><Input required {...field('name')} /></Field>
-        <Field label="Wallet address"><Input required placeholder="0x…" {...field('walletAddress')} /></Field>
-        <Field label="Hedera account" hint="Needed to accept payments on Hedera.">
+        <div className="space-y-2 text-sm">
+          <span className="block font-medium">Wallet for Arc payments</span>
+          <ConnectWallet address={form.walletAddress} onChange={setWallet} />
+          <Input required aria-label="Wallet address" placeholder="or paste a 0x address" {...field('walletAddress')} />
+          <span className="block text-xs text-ink-3">USDC from agents on Arc is paid to this address.</span>
+        </div>
+        <Field label="Hedera account" hint="Optional. Needed to accept payments on Hedera.">
           <Input placeholder="0.0.1234" {...field('hederaAccount')} />
         </Field>
         <div className="flex items-center gap-3 sm:col-span-2">
@@ -86,7 +97,7 @@ function ProfileForm({ provider, onSaved }: { provider: ProviderDto | null; onSa
 }
 
 function ServiceForm({ onCreated }: { onCreated: () => void }) {
-  const empty = { name: '', description: '', endpoint: '', price: '0.01', usageCode: '', apiKey: '', apiKeyPlacement: 'bearer', apiKeyName: '', supportedNetworks: ['arc-testnet'] as NetworkId[] };
+  const empty = { name: '', category: 'OTHER', description: '', endpoint: '', price: '0.01', usageCode: '', apiKey: '', apiKeyPlacement: 'bearer', apiKeyName: '', supportedNetworks: ['arc-testnet'] as NetworkId[] };
   const [form, setForm] = useState(empty);
   const [error, setError] = useState<string>();
 
@@ -94,7 +105,7 @@ function ServiceForm({ onCreated }: { onCreated: () => void }) {
     event.preventDefault();
     setError(undefined);
     try {
-      await api('/api/provider/services', { method: 'POST', body: JSON.stringify({ ...form, category: 'Other' }) });
+      await api('/api/provider/services', { method: 'POST', body: JSON.stringify(form) });
       setForm(empty);
       onCreated();
     } catch (cause) {
@@ -107,8 +118,15 @@ function ServiceForm({ onCreated }: { onCreated: () => void }) {
       <form onSubmit={create} className="grid gap-4 sm:grid-cols-2">
         <Field label="API name"><Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
         <Field label="Price per request in USD"><Input required inputMode="decimal" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></Field>
+        <Field label="Category">
+          <Select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+            {CATEGORY_LIST.filter(({ value }) => value).map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </Select>
+        </Field>
         <div className="sm:col-span-2">
-          <Field label="Your API URL" hint="PayGate calls this after a payment is verified.">
+          <Field label="Your API URL" hint="SPICA calls this after a payment is verified.">
             <Input required type="url" placeholder="https://api.example.com/data" value={form.endpoint} onChange={(e) => setForm({ ...form, endpoint: e.target.value })} />
           </Field>
         </div>
@@ -131,7 +149,7 @@ function ServiceForm({ onCreated }: { onCreated: () => void }) {
           <Field label="Description"><Textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
         </div>
         <div className="sm:col-span-2">
-          <Field label="Code buyers get after paying" hint="Up to 3 lines, shown only after payment. Leave it empty and PayGate generates a snippet.">
+          <Field label="Code buyers get after paying" hint="Up to 3 lines, shown only after payment. Leave it empty and SPICA generates a snippet.">
             <Textarea rows={3} spellCheck={false} className="font-mono" placeholder={'const res = await fetch("https://api.example.com/data");\nconst data = await res.json();\nconsole.log(data);'} value={form.usageCode} onChange={(e) => setForm({ ...form, usageCode: e.target.value })} />
           </Field>
         </div>
@@ -195,7 +213,7 @@ export default function Provider() {
 
   return (
     <>
-      <PageHeader title="Provider" description="Sell your API to agents. Set a price, and PayGate handles payment before each request reaches you." />
+      <PageHeader title="Provider" description="Sell your API to agents. Set a price, and SPICA handles payment before each request reaches you." />
       <div className="space-y-4">
         {provider && (
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

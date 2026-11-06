@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- standalone Node script */
 require("dotenv").config({ path: ".env.local" });
 
 const {

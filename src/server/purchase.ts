@@ -9,7 +9,7 @@ import { NETWORKS, networkByCaip2, type NetworkId } from '@/lib/networks';
 import { settlementProof } from '@/lib/proof';
 import { auditPayment } from '@/server/audit/record';
 import type { CatalogService } from '@/server/discovery/types';
-import { activeNetworks, mainnetEnabled, publicUrl } from '@/server/env';
+import { activeNetworks, publicUrl } from '@/server/env';
 import { evaluatePolicy, type PolicyDecision } from '@/server/firewall/policy';
 import { assertPublicUrl, safeFetch } from '@/server/http/guard';
 import { getAdapter } from '@/server/payments/registry';
@@ -73,9 +73,13 @@ export function parsePaymentRequired(headers: Headers, body: string): PaymentReq
   }
 }
 
-/** Networks this deployment can pay on and the person allows. Demo is never a policy choice. */
-export const payableNetworks = (active: NetworkId[], allowed: NetworkId[]) =>
-  active.filter((network) => network === 'demo' || allowed.includes(network));
+/**
+ * Networks a purchase may use: enabled on this server and allowed by the person.
+ * The demo rail is exempt from the person's list, as in the policy engine.
+ */
+export function payableNetworks(active: NetworkId[], allowed: NetworkId[]): NetworkId[] {
+  return active.filter((network) => network === 'demo' || allowed.includes(network));
+}
 
 /** Cheapest offer this deployment can pay. Network filtering happens before the firewall sees it. */
 export function selectRequirement(paymentRequired: PaymentRequired, networks: NetworkId[]) {
@@ -134,8 +138,10 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
   const paymentRequired = parsePaymentRequired(first.headers, first.text);
   if (!paymentRequired) {
     await observe({ reachable: true, succeeded: false, paid: false });
-    return { outcome: 'failed', reason: 'The service sent payment terms PayGate could not read.' };
+    return { outcome: 'failed', reason: 'The service sent payment terms SPICA could not read.' };
   }
+  // Choose among networks the person allows, so a cheaper offer on a network they
+  // turned off does not hide one they would accept.
   const policy = await store.getPolicy(userId);
   const networks = payableNetworks(activeNetworks(), policy.allowedNetworks).filter(
     (candidate) => !context.preferredNetwork || candidate === context.preferredNetwork,
@@ -143,7 +149,10 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
   const selected = selectRequirement(paymentRequired, networks);
   if (!selected) {
     await observe({ reachable: true, succeeded: false, paid: false });
-    return { outcome: 'denied', code: 'network_not_allowed', reason: 'The service does not accept any network allowed here.' };
+    const reason = selectRequirement(paymentRequired, activeNetworks())
+      ? 'The service only accepts networks you have not allowed.'
+      : 'The service does not accept any network enabled here.';
+    return { outcome: 'denied', code: 'network_not_allowed', reason };
   }
   const { requirement, network } = selected;
   const amountMicros = BigInt(requirement.amount);
@@ -163,7 +172,6 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
     taskBudgetMicros: context.taskBudgetMicros,
   };
   const decision = evaluatePolicy(policy, paymentRequest, await store.getSpendState(userId, taskId), {
-    mainnetEnabled: mainnetEnabled(),
     humanApproved,
   });
   emit({ type: 'policy', decision: decision.outcome, reason: decision.reason });
@@ -277,7 +285,7 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
       const transaction = await record({ status: 'unverified', reference: null, payer: null, detail: 'The seller returned data with no settlement proof.' });
       return { outcome: 'delivered', data: paid.text, transaction, free: false };
     }
-    // PayGate's own seller says so only when settlement never ran. Third parties are not taken at their word.
+    // SPICA's own seller says so only when settlement never ran. Third parties are not taken at their word.
     if (service.source !== 'circle' && paid.headers.get(NOT_SETTLED_HEADER)) {
       await store.releaseReservation(reservationId, { paymentNotSent: true });
       const transaction = await record({ status: 'failed', reference: null, payer: null, detail: `The service returned HTTP ${paid.status}, so nothing was charged.` });
@@ -306,7 +314,7 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
   const transaction = await record(confirmation);
   await observe({ reachable: true, succeeded: confirmation.status !== 'failed', paid: true, quoted: amountMicros });
 
-  // Only PayGate's own seller route is trusted to set this header.
+  // Only SPICA's own seller route is trusted to set this header.
   const provided = service.source === 'paygate' ? decodeUsageCode(paid.headers.get(USAGE_CODE_HEADER)) : null;
   const apiKey =
     confirmation.status === 'failed' || repeatable || provided || service.source === 'circle'

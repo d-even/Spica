@@ -26,10 +26,7 @@ export async function publishAuditEvent(event: HcsAuditEvent): Promise<{ topicId
   const topicId = process.env.HEDERA_HCS_TOPIC_ID!;
   const rawKey = process.env.HEDERA_OPERATOR_KEY!;
   const key = /^(0x)?[0-9a-fA-F]{64}$/.test(rawKey) ? PrivateKey.fromStringECDSA(rawKey) : PrivateKey.fromString(rawKey);
-  const client = (process.env.HEDERA_HCS_NETWORK === 'mainnet' ? Client.forMainnet() : Client.forTestnet()).setOperator(
-    process.env.HEDERA_OPERATOR_ID!,
-    key,
-  );
+  const client = Client.forTestnet().setOperator(process.env.HEDERA_OPERATOR_ID!, key);
   try {
     const response = await new TopicMessageSubmitTransaction({ topicId, message: JSON.stringify(event) }).execute(client);
     const receipt = await response.getReceipt(client);

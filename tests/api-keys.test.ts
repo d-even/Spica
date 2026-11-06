@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { issueApiKey, readApiKey } from '@/server/api-keys';
-import { readToken, signToken } from '@/server/wallet-auth';
+import { seal, unseal } from '@/server/session';
 
 const secret = 'test-secret-that-is-at-least-32-characters';
 const grant = { userId: 'user', agentId: 'agent', serviceId: 'cricket-live', taskId: 'task', budgetMicros: '50000' };
@@ -18,7 +18,7 @@ describe('developer API keys', () => {
     const key = issueApiKey(grant)!;
     const [body, signature] = key.slice(3).split('.');
     const value = JSON.parse(Buffer.from(body, 'base64url').toString());
-    const edited = Buffer.from(JSON.stringify({ ...value, value: JSON.stringify({ ...grant, budgetMicros: '999999999' }) })).toString('base64url');
+    const edited = Buffer.from(JSON.stringify({ ...value, grant: { ...grant, budgetMicros: '999999999' } })).toString('base64url');
     expect(readApiKey(`pg_${edited}.${signature}`)).toBeNull();
   });
 
@@ -29,9 +29,9 @@ describe('developer API keys', () => {
   });
 
   it('keeps sessions and keys apart, so neither stands in for the other', () => {
-    const session = signToken('session', JSON.stringify(grant), Date.now() + 60_000, secret);
+    const session = seal('session', { grant }, 60);
     expect(readApiKey(`pg_${session}`)).toBeNull();
-    expect(readToken('session', issueApiKey(grant)!.slice(3), secret)).toBeNull();
+    expect(unseal('session', issueApiKey(grant)!.slice(3))).toBeNull();
   });
 
   it('refuses anything else', () => {

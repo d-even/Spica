@@ -2,74 +2,56 @@
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-:root {
-  --bg: #f6f7f9;
+/* SPICA palette. Cream is the default everywhere; dark is an explicit choice in the app. */
+:root,
+.spica {
+  --cream: #f8f5ec;
+  --yellow: #ffe34d;
+  --black: #111111;
+  --orange: #f04b2d;
+  --mint: #a9e8b7;
+  --bg: var(--cream);
   --surface: #ffffff;
-  --surface-2: #f0f2f5;
-  --ink: #14161c;
-  --ink-2: #4b5261;
-  --ink-3: #6b7280;
-  --line: #e4e7ec;
-  --accent: #4f46e5;
+  --surface-2: #f1ecdd;
+  --ink: #111111;
+  --ink-2: #45413a;
+  --ink-3: #68635a;
+  --line: #e2dbc9;
+  /* Deeper than --orange so small text stays readable on cream. */
+  --accent: #c2361b;
   --accent-ink: #ffffff;
-  --chart: #4f46e5;
-  --good: #047857;
-  --good-bg: #e6f6f0;
-  --warn: #92400e;
-  --warn-bg: #fdf1dc;
-  --bad: #b42318;
-  --bad-bg: #fdecea;
-  --info: #3730a3;
-  --info-bg: #eaeafd;
-  --shadow: 0 1px 2px rgb(20 22 28 / 0.04), 0 4px 16px rgb(20 22 28 / 0.04);
+  --chart: #f04b2d;
+  --good: #0e6b3a;
+  --good-bg: #d9f5df;
+  --warn: #7a5000;
+  --warn-bg: #fff4b8;
+  --bad: #b3261e;
+  --bad-bg: #fde3dc;
+  --info: #111111;
+  --info-bg: #ffe34d;
+  --shadow: 3px 3px 0 var(--ink);
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0d0f13;
-    --surface: #14161c;
-    --surface-2: #1c1f27;
-    --ink: #f2f3f5;
-    --ink-2: #b6bbc6;
-    --ink-3: #9aa0ad;
-    --line: #272b35;
-    --accent: #818cf8;
-    --accent-ink: #0d0f13;
-    --chart: #767cf0;
-    --good: #5eead4;
-    --good-bg: #0f2a26;
-    --warn: #fbbf24;
-    --warn-bg: #2d2210;
-    --bad: #fca5a5;
-    --bad-bg: #331616;
-    --info: #c7d2fe;
-    --info-bg: #1f2140;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.3);
-    color-scheme: dark;
-  }
-}
-
 :root[data-theme="dark"] {
-  --bg: #0d0f13;
-  --surface: #14161c;
-  --surface-2: #1c1f27;
-  --ink: #f2f3f5;
-  --ink-2: #b6bbc6;
-  --ink-3: #9aa0ad;
-  --line: #272b35;
-  --accent: #818cf8;
-  --accent-ink: #0d0f13;
-  --chart: #767cf0;
-  --good: #5eead4;
-  --good-bg: #0f2a26;
-  --warn: #fbbf24;
-  --warn-bg: #2d2210;
-  --bad: #fca5a5;
-  --bad-bg: #331616;
-  --info: #c7d2fe;
-  --info-bg: #1f2140;
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  --bg: #16140f;
+  --surface: #201d16;
+  --surface-2: #2b2720;
+  --ink: #f8f5ec;
+  --ink-2: #cfc9ba;
+  --ink-3: #a8a192;
+  --line: #3a352b;
+  --accent: #ffe34d;
+  --accent-ink: #111111;
+  --chart: #ffe34d;
+  --good: #a9e8b7;
+  --good-bg: #17301f;
+  --warn: #ffe34d;
+  --warn-bg: #332b0c;
+  --bad: #ff9c88;
+  --bad-bg: #3a1a12;
+  --info: #ffe34d;
+  --info-bg: #332b0c;
   color-scheme: dark;
 }
 
@@ -92,8 +74,9 @@
   --color-info: var(--info);
   --color-info-bg: var(--info-bg);
   --shadow-card: var(--shadow);
-  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+  --font-display: var(--font-anton), Impact, sans-serif;
 }
 
 body {

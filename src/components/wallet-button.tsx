@@ -3,13 +3,13 @@
 import { LogOut, Wallet } from 'lucide-react';
 import { useState } from 'react';
 import { api, useApi } from './api';
-import { openFresh, signInWithWallet, walletErrorMessage } from './wallet';
+import { openFresh, signInWithArc, walletErrorMessage } from './wallet';
 
 const shorten = (address: string) => `${address.slice(0, 6)}…${address.slice(-4)}`;
 
 /** Connects a wallet, or shows the connected one. Works signed in or out, in the app and on the landing page. */
 export function WalletButton({ connectClassName, connectedClassName, afterConnect }: { connectClassName: string; connectedClassName: string; afterConnect?: string }) {
-  const { data, reload } = useApi<{ wallet: string | null }>('/api/auth/me');
+  const { data, reload } = useApi<{ wallet: string | null; signedIn: boolean }>('/api/auth/me');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -17,7 +17,7 @@ export function WalletButton({ connectClassName, connectedClassName, afterConnec
     setBusy(true);
     setError(undefined);
     try {
-      await signInWithWallet();
+      await signInWithArc();
       openFresh(afterConnect ?? window.location.pathname);
     } catch (cause) {
       setError(walletErrorMessage(cause));
@@ -36,6 +36,15 @@ export function WalletButton({ connectClassName, connectedClassName, afterConnec
     } finally {
       setBusy(false);
     }
+  }
+
+  // An email account has no wallet to show, and connecting one here would switch accounts.
+  if (data?.signedIn && !data.wallet) {
+    return (
+      <button type="button" disabled={busy} onClick={disconnect} className={`inline-flex items-center gap-1.5 whitespace-nowrap disabled:opacity-60 ${connectClassName}`}>
+        <LogOut size={14} aria-hidden /> Sign out
+      </button>
+    );
   }
 
   if (data?.wallet) {

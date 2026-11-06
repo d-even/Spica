@@ -1,4 +1,3 @@
-import { NETWORKS } from '@/lib/networks';
 import { auditProof, settlementProof, type PaymentProof } from '@/lib/proof';
 import { apiError, authed, toJson } from '@/server/http/api';
 import { refreshTransaction } from '@/server/settlement';
@@ -21,7 +20,7 @@ export const GET = authed(async (user, _request, { params }: { params: Promise<{
     settlement: settlementProof(current),
     audit: published.flatMap((event) => {
       const { status, sequence, transactionId } = event.eventData as Record<string, string>;
-      return transactionId ? [auditProof(status ?? 'recorded', sequence, transactionId, NETWORKS[current.network].mainnet)] : [];
+      return transactionId ? [auditProof(status ?? 'recorded', sequence, transactionId)] : [];
     }),
     auditPending: current.status === 'verified' && published.length > 0 && !published.some((event) => event.eventData.status === 'verified'),
   };
