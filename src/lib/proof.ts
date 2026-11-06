@@ -14,9 +14,12 @@ export interface PaymentProof {
 }
 
 const EXPLORER: Partial<Record<NetworkId, string>> = {
-  'arc-testnet': 'Arc Explorer',
+  'arc-testnet': 'Circle Explorer (Arc Testnet)',
   'hedera-testnet': 'HashScan',
 };
+
+/** Each payment shows one explorer. Audit messages open on HashScan, so only Hedera payments list them. */
+export const showsAudit = (network: NetworkId) => network === 'hedera-testnet';
 
 /** Null until the payment is final. While settling, the reference is a Gateway ID no explorer knows. */
 export function settlementProof(transaction: { network: NetworkId; status: string; reference: string | null }): ProofLink | null {

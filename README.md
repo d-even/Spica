@@ -26,7 +26,8 @@ Last checked on 2026-11-07. SPICA runs in live mode on testnet only. A real Arc 
 | Area | Status |
 | --- | --- |
 | App, agent, firewall and approvals | Working in live mode with Supabase |
-| Unit tests | 133 of 133 passing, and `tsc` is clean |
+| Unit tests | 165 of 165 passing, and `tsc` is clean |
+| Agent SDK | Built in [`packages/agent-sdk`](packages/agent-sdk), with its own tests. Not published to npm. |
 | Arc payments | Working. Gemini bought a service through Circle Gateway, and the payment settled onchain |
 | Hedera payments | Accounts are set up and signing works. All 3 attempts failed, and the agent account holds 0 testnet USDC |
 | HCS audit | Publishing. Only verified or settling payments are published so far, and the topic has no submit key |
@@ -38,7 +39,7 @@ Not built yet:
 - Multiple agents and agent identity
 - The other five agent tools, and provider comparison
 - Audit events for rejections, mirror-node verification and an audit dashboard
-- Provider and agent SDKs
+- Provider SDK
 - The remaining API routes
 
 ## Steps so far

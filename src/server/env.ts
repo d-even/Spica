@@ -83,10 +83,11 @@ export function integrations(): Integration[] {
   ];
 }
 
-/** The wallet the agent pays from. Circle refuses a payment to the wallet it comes from. */
+/** The agent's own Arc wallet or Hedera account. A payment to it would be a transfer to itself, which every network refuses. */
 export function isAgentWallet(address: string) {
+  if (address === process.env.HEDERA_AGENT_ACCOUNT_ID) return true;
   const key = process.env.AGENT_PRIVATE_KEY;
-  if (!key) return false;
+  if (!key || !address.startsWith('0x')) return false;
   return privateKeyToAccount((key.startsWith('0x') ? key : `0x${key}`) as `0x${string}`).address.toLowerCase() === address.toLowerCase();
 }
 

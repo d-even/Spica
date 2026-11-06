@@ -9,8 +9,6 @@ const NONCE_COOKIE = 'paygate_siwe_nonce';
 export const DEMO_USER_ID = '00000000-0000-4000-8000-000000000001';
 
 const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
-export const SHORT_SESSION_TTL_SECONDS = 24 * 60 * 60;
-export const LONG_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 /** How long a sign-in nonce, and the message signed with it, stay usable. */
 export const NONCE_TTL_SECONDS = 10 * 60;
 
@@ -19,7 +17,7 @@ export type WalletChain = 'arc-testnet';
 
 export interface SessionUser {
   id: string;
-  /** The signed-in wallet. Null for email accounts and the shared demo user. */
+  /** The signed-in wallet. Null for the shared demo user and older email sessions. */
   address: string | null;
   chain: WalletChain | null;
   demo: boolean;
@@ -61,9 +59,9 @@ export async function currentUser(): Promise<SessionUser | null> {
   return mode() === 'demo' ? { id: DEMO_USER_ID, address: null, chain: null, demo: true } : null;
 }
 
-export async function startSession(user: { id: string; address: string | null; chain: WalletChain | null }, ttlSeconds = SESSION_TTL_SECONDS) {
-  const token = seal('session', { sub: user.id, addr: user.address, chain: user.chain }, ttlSeconds);
-  (await cookies()).set(SESSION_COOKIE, token, cookieOptions(ttlSeconds));
+export async function startSession(user: { id: string; address: string; chain: WalletChain }) {
+  const token = seal('session', { sub: user.id, addr: user.address, chain: user.chain }, SESSION_TTL_SECONDS);
+  (await cookies()).set(SESSION_COOKIE, token, cookieOptions(SESSION_TTL_SECONDS));
 }
 
 export async function clearSession() {

@@ -55,7 +55,7 @@ export default function Home() {
             <p className="s-lead mt-4">One SDK to discover services, control spending and execute autonomous USDC payments.</p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link href="/marketplace" className="s-btn">Explore Marketplace <ArrowRight size={17} aria-hidden /></Link>
-              <Link href="/signup" className="s-btn s-btn-plain">Start Building</Link>
+              <Link href="/login" className="s-btn s-btn-plain">Start Building</Link>
             </div>
           </div>
           <HeroAnimation />
@@ -200,7 +200,7 @@ export default function Home() {
             <div className="s-cta-copy">
               <h2 className="s-display">Build your first payment-aware agent.</h2>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Link href="/signup" className="s-btn s-btn-plain">Get Started</Link>
+                <Link href="/login" className="s-btn s-btn-plain">Get Started</Link>
                 <Link href="/docs" className="s-btn s-btn-plain">Read Documentation</Link>
               </div>
             </div>

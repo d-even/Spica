@@ -10,6 +10,7 @@ import { allowRequest } from '@/server/http/rate-limit';
 
 const query = z.object({
   query: z.string().max(100).optional(),
+  category: z.string().trim().max(40).optional(),
   maxUsdPrice: z.string().regex(/^\d+(\.\d{1,6})?$/).optional(),
   network: z.enum(SELECTABLE_NETWORKS as [NetworkId, ...NetworkId[]]).optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),

@@ -31,7 +31,7 @@ export function Navbar() {
   ) : (
     <>
       <Link href="/login" className="s-nav-link" onClick={() => setOpen(false)}>Login</Link>
-      <Link href="/signup" className="s-btn s-btn-sm" onClick={() => setOpen(false)}>Get Started</Link>
+      <Link href="/login" className="s-btn s-btn-sm" onClick={() => setOpen(false)}>Get Started</Link>
     </>
   );
   const wallet = <WalletButton connectClassName="s-btn s-btn-sm s-btn-plain" connectedClassName="s-btn s-btn-sm s-btn-plain" afterConnect="/dashboard" />;

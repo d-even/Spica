@@ -33,7 +33,9 @@ export const GET = authed(async (user) => {
  */
 export const PUT = authed(async (user, request) => {
   const input = body.parse(await request.json());
-  if (isAgentWallet(input.walletAddress)) return apiError('That wallet pays for agent purchases, so it cannot receive them. Use a different wallet.', 400);
+  if (isAgentWallet(input.walletAddress) || (input.hederaAccount && isAgentWallet(input.hederaAccount))) {
+    return apiError('That account pays for agent purchases, so it cannot receive them. Use a different one.', 400);
+  }
   const provider = await getStore().saveProvider({
     ownerUserId: user.id,
     name: input.name,

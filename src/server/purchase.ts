@@ -13,6 +13,7 @@ import { activeNetworks, publicUrl } from '@/server/env';
 import { evaluatePolicy, type PolicyDecision } from '@/server/firewall/policy';
 import { assertPublicUrl, safeFetch } from '@/server/http/guard';
 import { getAdapter } from '@/server/payments/registry';
+import { readProviderFailure } from '@/server/provider-call';
 import type { Confirmation } from '@/server/payments/types';
 import { requirementHash, signPayment } from '@/server/signer';
 import { watchSettlement } from '@/server/settlement';
@@ -77,6 +78,18 @@ export function parsePaymentRequired(headers: Headers, body: string): PaymentReq
  * Networks a purchase may use: enabled on this server and allowed by the person.
  * The demo rail is exempt from the person's list, as in the policy engine.
  */
+/** The rejections a person can act on, in plain words. Anything else keeps its code. */
+const REJECTIONS: Record<string, string> = {
+  self_transfer: "The provider's payout wallet is the agent's own wallet, so nothing can be paid.",
+  invalid_exact_hedera_payload_amount_mismatch: "The provider's payout account is the agent's own account, so nothing can be paid.",
+  invalid_exact_hedera_payload_preflight_failed: 'Hedera refused the transfer in a trial run. The agent account may not hold enough testnet USDC.',
+};
+
+const rejectionDetail = (code: string | undefined) => {
+  if (!code) return 'The seller rejected the payment.';
+  return REJECTIONS[code] ?? `The seller rejected the payment: ${code}.`;
+};
+
 export function payableNetworks(active: NetworkId[], allowed: NetworkId[]): NetworkId[] {
   return active.filter((network) => network === 'demo' || allowed.includes(network));
 }
@@ -273,7 +286,7 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
     await store.releaseReservation(reservationId, { paymentNotSent: true });
     await observe({ reachable: true, succeeded: false, paid: true, quoted: amountMicros });
     const rejection = parsePaymentRequired(paid.headers, paid.text)?.error;
-    const detail = rejection ? `The seller rejected the payment: ${rejection}.` : 'The seller rejected the payment.';
+    const detail = rejectionDetail(rejection);
     const transaction = await record({ status: 'failed', reference: null, payer: null, detail });
     return { outcome: 'failed', reason: `${detail} No money moved.`, transaction };
   }
@@ -288,8 +301,9 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
     // SPICA's own seller says so only when settlement never ran. Third parties are not taken at their word.
     if (service.source !== 'circle' && paid.headers.get(NOT_SETTLED_HEADER)) {
       await store.releaseReservation(reservationId, { paymentNotSent: true });
-      const transaction = await record({ status: 'failed', reference: null, payer: null, detail: `The service returned HTTP ${paid.status}, so nothing was charged.` });
-      return { outcome: 'failed', reason: 'The service is having trouble right now, so nothing was charged. Try again shortly.', transaction };
+      const detail = `${readProviderFailure(paid.text) ?? `The provider's API returned HTTP ${paid.status}.`} Nothing was charged.`;
+      const transaction = await record({ status: 'failed', reference: null, payer: null, detail });
+      return { outcome: 'failed', reason: detail, transaction };
     }
     const transaction = await record({ status: 'unverified', reference: null, payer: null, detail: `The seller returned HTTP ${paid.status} after the proof was sent.` });
     return { outcome: 'failed', reason: `The service returned HTTP ${paid.status} after payment was sent. The amount stays held for review.`, transaction };

@@ -8,6 +8,7 @@ import { TrustBadge } from '@/components/spica/ApiCard';
 import { Badge, Button, Input, StatusBadge } from '@/components/ui';
 import { formatUsd } from '@/lib/money';
 import { NETWORKS, networkByCaip2, type NetworkId } from '@/lib/networks';
+import { settlementProof } from '@/lib/proof';
 import { categoryMeta, hostOf, paramFields, shorten, type Service } from './meta';
 import type { Quote } from './quote';
 
@@ -66,16 +67,17 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 function ReceiptLine({ receipt }: { receipt: Receipt }) {
   const network = NETWORKS[receipt.network];
-  const explorer = receipt.reference && receipt.status !== 'simulated' ? network?.explorerTx?.(receipt.reference) : undefined;
+  // Only a final payment has a link: a settling Arc payment has a Gateway ID no explorer knows.
+  const proof = settlementProof(receipt);
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
       <StatusBadge status={receipt.status} />
       <span className="text-ink-2">
         {formatUsd(receipt.amountMicros)} on {network?.label ?? receipt.network}
       </span>
-      {explorer && (
-        <a href={explorer} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-accent underline-offset-2 hover:underline">
-          View on explorer <ExternalLink size={12} aria-hidden />
+      {proof && (
+        <a href={proof.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-accent underline-offset-2 hover:underline">
+          {proof.label} <ExternalLink size={12} aria-hidden />
         </a>
       )}
       <Link href={`/transactions/${receipt.id}`} className="text-ink-3 underline-offset-2 hover:underline">

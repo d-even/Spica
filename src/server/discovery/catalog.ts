@@ -1,7 +1,7 @@
 import 'server-only';
 import { microsToUsd } from '@/lib/money';
 import { NETWORKS, type NetworkId } from '@/lib/networks';
-import { activeNetworks, circleCatalogEnabled, mode, publicUrl } from '@/server/env';
+import { activeNetworks, circleCatalogEnabled, isAgentWallet, mode, publicUrl } from '@/server/env';
 import { getStore } from '@/server/store';
 import type { ServiceRecord } from '@/server/store/types';
 import { discover, recentlyDiscovered } from './circle';
@@ -15,7 +15,8 @@ export async function registeredToCatalog(service: ServiceRecord): Promise<Catal
   const payTo = (network: NetworkId) => (NETWORKS[network].family === 'hedera' ? provider.hederaAccount : provider.walletAddress);
   const offers = networks.flatMap((network) => {
     const address = payTo(network);
-    return address
+    // A listing that pays the agent itself can never settle, so it is not offered.
+    return address && !isAgentWallet(address)
       ? [{ network, amountMicros: service.priceMicros.toString(), payTo: address, asset: NETWORKS[network].tokenAsset }]
       : [];
   });

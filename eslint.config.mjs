@@ -14,6 +14,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Retired integrations kept for reference only.
     "legacy/**",
+    "packages/*/dist/**",
   ]),
 ]);
 

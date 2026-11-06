@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { applyCredential, hashSecret, openSecret, sealSecret } from '@/server/secrets';
-import { auditProof, settlementProof } from '@/lib/proof';
+import { auditProof, settlementProof, showsAudit } from '@/lib/proof';
 import { hashscanTransaction } from '@/lib/networks';
 
 describe('provider API keys', () => {
@@ -51,6 +51,13 @@ describe('payment proof links', () => {
     expect(settlementProof({ network: 'arc-testnet', status: 'verified', reference: hash })?.url).toBe(`https://explorer.testnet.arc.io/tx/${hash}`);
     expect(settlementProof({ network: 'arc-testnet', status: 'settling', reference: 'gateway-id' })).toBeNull();
     expect(settlementProof({ network: 'demo', status: 'verified', reference: 'simulated_1' })).toBeNull();
+  });
+
+  it('shows each payment on its own explorer', () => {
+    expect(settlementProof({ network: 'arc-testnet', status: 'verified', reference: `0x${'a'.repeat(64)}` })?.label).toBe('Settlement on Circle Explorer (Arc Testnet)');
+    expect(settlementProof({ network: 'hedera-testnet', status: 'verified', reference: '0.0.1@2.3' })?.label).toBe('Settlement on HashScan');
+    expect(showsAudit('hedera-testnet')).toBe(true);
+    expect(showsAudit('arc-testnet')).toBe(false);
   });
 
   it('formats HashScan links the way HashScan opens them', () => {

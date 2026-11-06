@@ -43,6 +43,7 @@
     "node_modules",
     "legacy",
     "paygate-x402/dist",
+    "packages",
     "vitest.config.mts",
     "vitest.live.config.mts"
   ]

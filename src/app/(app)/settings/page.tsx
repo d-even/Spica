@@ -2,6 +2,7 @@
 
 import { CheckCircle2, CircleDashed } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { AgentKeyCard } from '@/components/agent-key-card';
 import { api, useApi, type OverviewDto } from '@/components/api';
 import { Badge, Button, Card, ErrorNote, Loading, PageHeader } from '@/components/ui';
 
@@ -54,6 +55,8 @@ export default function Settings() {
             ))}
           </ul>
         </Card>
+
+        <AgentKeyCard />
 
         {data.user.demo && (
           <Card title="Account">

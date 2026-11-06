@@ -26,7 +26,7 @@ export default function Docs() {
       <div className="s-docs">
         <section>
           <h2 className="s-display">1. Set your limits</h2>
-          <p><Link className="s-link" href="/signup">Create an account</Link>. Every purchase is checked on the server against your spending rules. They start at $0.50 per request, $1 a day and $10 a month, and payments over $0.20 wait for your approval. Change them on the <Link className="s-link" href="/controls">Spending limits</Link> page.</p>
+          <p><Link className="s-link" href="/login">Connect your wallet</Link>. Every purchase is checked on the server against your spending rules. They start at $0.50 per request, $1 a day and $10 a month, and payments over $0.20 wait for your approval. Change them on the <Link className="s-link" href="/controls">Spending limits</Link> page.</p>
         </section>
 
         <section className="space-y-3">

@@ -1,13 +1,12 @@
 import { connection } from 'next/server';
 import { withPayment } from 'paygate-x402';
-import { encodeUsageCode, USAGE_CODE_HEADER } from '@/lib/usage-code';
 import { registeredToCatalog } from '@/server/discovery/catalog';
 import type { CatalogService } from '@/server/discovery/types';
 import { apiError } from '@/server/http/api';
-import { assertPublicUrl, safeFetch } from '@/server/http/guard';
 import { allowRequest } from '@/server/http/rate-limit';
 import { getAdapter } from '@/server/payments/registry';
-import { applyCredential, type ServiceCredential } from '@/server/secrets';
+import { deliverFromProvider } from '@/server/provider-call';
+import type { ServiceCredential } from '@/server/secrets';
 import { getStore } from '@/server/store';
 
 interface ResolvedService {
@@ -31,24 +30,6 @@ async function resolve(serviceId: string): Promise<ResolvedService | null> {
   return service && provider ? { service, upstream: record.endpoint, ownerUserId: provider.ownerUserId, usageCode: record.usageCode, credential } : null;
 }
 
-/** Data is produced before settlement, so a failure here charges nobody. */
-async function deliver(upstream: string, usageCode: string | null, credential: ServiceCredential | null, query: URLSearchParams): Promise<Response> {
-  const url = await assertPublicUrl(upstream);
-  for (const [key, value] of query) url.searchParams.set(key, value);
-  const headers: Record<string, string> = { accept: 'application/json' };
-  // Added last, and redirects stay off in safeFetch, so the key reaches only this URL.
-  if (credential) applyCredential(url, headers, credential);
-  const response = await safeFetch(url, { headers });
-  // withPayment returns this only after settlement, so the code is never released unpaid.
-  return new Response(response.text, {
-    status: response.status,
-    headers: {
-      'content-type': response.headers.get('content-type') ?? 'application/json',
-      ...(usageCode ? { [USAGE_CODE_HEADER]: encodeUsageCode(usageCode) } : {}),
-    },
-  });
-}
-
 export async function GET(request: Request, { params }: { params: Promise<{ serviceId: string }> }) {
   await connection();
   const { serviceId } = await params;
@@ -61,7 +42,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ serv
     const { service, upstream, ownerUserId, usageCode, credential } = resolved;
     const store = getStore();
 
-    const handler = withPayment(() => deliver(upstream, usageCode, credential, new URL(request.url).searchParams), {
+    const handler = withPayment(() => deliverFromProvider(upstream, usageCode, credential, new URL(request.url).searchParams), {
       offers: service.offers.map((offer) => ({
         adapter: getAdapter(offer.network),
         amountAtomic: offer.amountMicros,

@@ -16,6 +16,12 @@ describe('isAgentWallet', () => {
     expect(isAgentWallet(agent)).toBe(true);
   });
 
+  it('spots the agent Hedera account', () => {
+    vi.stubEnv('HEDERA_AGENT_ACCOUNT_ID', '0.0.777');
+    expect(isAgentWallet('0.0.777')).toBe(true);
+    expect(isAgentWallet('0.0.778')).toBe(false);
+  });
+
   it('allows any other wallet, and stays quiet with no agent key', () => {
     vi.stubEnv('AGENT_PRIVATE_KEY', key);
     expect(isAgentWallet('0x000000000000000000000000000000000000dEaD')).toBe(false);
