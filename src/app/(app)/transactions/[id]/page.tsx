@@ -2,21 +2,21 @@
 
 import Link from 'next/link';
 import { CodeBlock } from '@/components/code-block';
+import { proofIncomplete, ProofLinks } from '@/components/payment-proof';
 import { use } from 'react';
-import { useApi, type TransactionDto } from '@/components/api';
+import { useApi, useRefreshWhile, type TransactionDto } from '@/components/api';
 import { Card, ErrorNote, Loading, PageHeader, StatusBadge } from '@/components/ui';
 import { formatUsd } from '@/lib/money';
 import { NETWORKS } from '@/lib/networks';
 
 export default function Receipt({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { data: tx, error } = useApi<TransactionDto>(`/api/transactions/${id}`);
+  const { data: tx, error, reload } = useApi<TransactionDto>(`/api/transactions/${id}`);
+  useRefreshWhile(Boolean(tx) && proofIncomplete(tx), reload);
   if (error) return <ErrorNote>{error}</ErrorNote>;
   if (!tx) return <Loading />;
 
   const network = NETWORKS[tx.network];
-  // While settling, the reference is a Gateway ID, which no block explorer knows.
-  const explorer = tx.reference && tx.status !== 'simulated' && tx.status !== 'settling' ? network.explorerTx?.(tx.reference) : undefined;
   const rows: [string, React.ReactNode][] = [
     ['Transaction ID', <span key="id" className="font-mono text-xs">{tx.id}</span>],
     ['Agent', <span key="agent" className="font-mono text-xs">{tx.agentId}</span>],
@@ -24,7 +24,7 @@ export default function Receipt({ params }: { params: Promise<{ id: string }> })
     ['API', tx.serviceName],
     ['Amount', `${formatUsd(tx.amountMicros)} ${tx.token}`],
     ['Network', network.label],
-    ['Reference', explorer ? <a key="ref" href={explorer} target="_blank" rel="noreferrer" className="break-all font-mono text-xs text-accent">{tx.reference}</a> : <span key="ref" className="break-all font-mono text-xs">{tx.reference ?? 'None'}</span>],
+    ['Reference', <span key="ref" className="break-all font-mono text-xs">{tx.reference ?? 'None'}</span>],
     ['Time', new Date(tx.createdAt).toLocaleString()],
     ['Verification', tx.statusDetail ?? 'None'],
   ];
@@ -42,6 +42,7 @@ export default function Receipt({ params }: { params: Promise<{ id: string }> })
           ))}
         </dl>
       </Card>
+      {tx.status !== 'simulated' && <Card className="mt-4 max-w-2xl" title="Proof"><ProofLinks proof={tx.proof} settling={tx.status === 'settling'} /></Card>}
       {tx.usageCode && <Card className="mt-4 max-w-2xl" title="Your API"><CodeBlock code={tx.usageCode} /></Card>}
       <Link href="/transactions" className="mt-4 inline-block text-sm font-medium text-accent">Back to payments</Link>
     </>

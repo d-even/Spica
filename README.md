@@ -226,6 +226,7 @@ Write a `SellerAdapter` to add a network. The middleware only knows the protocol
 - Sellers release data only after settlement, because Gateway's `verify` checks signatures, not balances.
 - Third-party text reaches the model marked as untrusted data, and a run can attempt at most three purchases.
 - Catalog URLs are checked against private address ranges, with redirects off, a timeout and a size cap.
+- Provider API keys are stored as an encrypted copy plus a keyed hash. A hash cannot be reversed, so the encrypted copy is what calls the provider. The key is decrypted only on the server, after payment.
 - Row-level security is on with no policies, so the public anon key can read nothing.
 - Spend totals and verification status are always computed on the server.
 

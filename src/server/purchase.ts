@@ -5,8 +5,9 @@ import { NOT_SETTLED_HEADER, type PaymentRequired, type PaymentRequirements, typ
 import { formatUsd } from '@/lib/money';
 import { decodeUsageCode, defaultUsageCode, developerApiCode, USAGE_CODE_HEADER } from '@/lib/usage-code';
 import { issueApiKey } from '@/server/api-keys';
-import { networkByCaip2, type NetworkId } from '@/lib/networks';
-import { publishAuditEvent, hcsConfigured } from '@/server/audit/hcs';
+import { NETWORKS, networkByCaip2, type NetworkId } from '@/lib/networks';
+import { settlementProof } from '@/lib/proof';
+import { auditPayment } from '@/server/audit/record';
 import type { CatalogService } from '@/server/discovery/types';
 import { activeNetworks, mainnetEnabled, publicUrl } from '@/server/env';
 import { evaluatePolicy, type PolicyDecision } from '@/server/firewall/policy';
@@ -14,6 +15,7 @@ import { assertPublicUrl, safeFetch } from '@/server/http/guard';
 import { getAdapter } from '@/server/payments/registry';
 import type { Confirmation } from '@/server/payments/types';
 import { requirementHash, signPayment } from '@/server/signer';
+import { watchSettlement } from '@/server/settlement';
 import { APPROVAL_TTL_MS } from '@/server/store/windows';
 import type { ApprovalRecord, SpendStore, TransactionRecord } from '@/server/store/types';
 
@@ -147,6 +149,7 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
   const amountMicros = BigInt(requirement.amount);
   const hash = requirementHash(requirement, resource);
   emit({ type: 'quote', service: service.name, amount: formatUsd(amountMicros), network });
+  console.log(`[x402] 402 Payment Required: ${service.name}, ${formatUsd(amountMicros)} USDC on ${NETWORKS[network].label}`);
 
   // 2. Firewall. The model has no say in it.
   const humanApproved = approval !== undefined && approval.status === 'approved' && approval.requirementHash === hash;
@@ -164,6 +167,7 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
     humanApproved,
   });
   emit({ type: 'policy', decision: decision.outcome, reason: decision.reason });
+  console.log(`[x402] Spending Firewall: ${decision.outcome}. ${decision.reason}`);
   await store.appendActivity({
     userId,
     transactionId: null,
@@ -345,24 +349,11 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
     },
   });
 
-  if (hcsConfigured() && (transaction.status === 'verified' || transaction.status === 'settling')) {
-    publishAuditEvent({
-      agentId: context.agentId,
-      providerKey: service.providerKey,
-      amountMicros: amountMicros.toString(),
-      token: 'USDC',
-      network,
-      reference: transaction.reference,
-      status: transaction.status,
-      timestamp: transaction.createdAt,
-    })
-      .then((result) =>
-        store.appendActivity({ userId, transactionId: transaction.id, eventType: 'hcs_published', eventData: { ...result } }),
-      )
-      .catch((error) =>
-        store.appendActivity({ userId, transactionId: transaction.id, eventType: 'hcs_failed', eventData: { message: String(error) } }),
-      );
-  }
+  console.log(`[x402] ${service.name}: ${transaction.status}. ${transaction.statusDetail}`);
+  const settled = settlementProof(transaction);
+  if (settled) console.log(`[proof] ${settled.label}: ${settled.url}`);
+  auditPayment(store, transaction);
+  if (transaction.status === 'settling') watchSettlement(store, transaction);
 
   return { outcome: 'delivered', data: paid.text, transaction, free: false };
 }

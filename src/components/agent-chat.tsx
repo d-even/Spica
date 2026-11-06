@@ -7,7 +7,8 @@ import type { AgentEvent, ServiceSummary } from '@/server/agent/session';
 import { NETWORKS, type NetworkId } from '@/lib/networks';
 import { api } from './api';
 import { CodeBlock } from './code-block';
-import { Badge, Button, Card, ErrorNote, StatusBadge, Textarea } from './ui';
+import { LivePayment } from './payment-proof';
+import { Badge, Button, Card, ErrorNote, Textarea } from './ui';
 
 const EXAMPLE = 'I want a live cricket scores API. My budget is $0.05, pay on Arc.';
 
@@ -227,11 +228,7 @@ export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean
               )}
               {receipt && (
                 <Card title="Payment" className="rise">
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg font-semibold tabular-nums">{receipt.transaction.amount}</span>
-                    <StatusBadge status={receipt.transaction.status} />
-                  </div>
-                  <p className="mt-1 text-xs text-ink-3">{receipt.transaction.detail}</p>
+                  <LivePayment id={receipt.transaction.id} amount={receipt.transaction.amount} status={receipt.transaction.status} detail={receipt.transaction.detail} />
                   <Link href={`/transactions/${receipt.transaction.id}`} className="mt-2 inline-block text-sm font-medium text-accent">
                     View receipt
                   </Link>

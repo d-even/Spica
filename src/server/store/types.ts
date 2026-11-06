@@ -1,4 +1,5 @@
 import type { NetworkId } from '@/lib/networks';
+import type { ServiceCredential } from '@/server/secrets';
 import type { CatalogService } from '@/server/discovery/types';
 import type { SpendingPolicy, SpendState } from '@/server/firewall/policy';
 
@@ -111,6 +112,8 @@ export interface ServiceRecord {
   enabled: boolean;
   /** Released to a buyer only after payment. Never part of a catalog entry. */
   usageCode: string | null;
+  /** Fingerprint of the provider's key, if it has one. The key itself is never on this record. */
+  apiKeyHash: string | null;
   createdAt: string;
 }
 
@@ -163,7 +166,9 @@ export interface SpendStore {
   getProviderByOwner(userId: string): Promise<ProviderRecord | null>;
   getProvider(id: string): Promise<ProviderRecord | null>;
   saveProvider(record: Omit<ProviderRecord, 'id' | 'createdAt'>): Promise<ProviderRecord>;
-  createService(record: Omit<ServiceRecord, 'id' | 'createdAt'>): Promise<ServiceRecord>;
+  createService(record: Omit<ServiceRecord, 'id' | 'createdAt'>, credential?: ServiceCredential): Promise<ServiceRecord>;
+  /** Server only, for calling the provider. Never return this to a client. */
+  getServiceCredential(id: string): Promise<ServiceCredential | null>;
   getService(id: string): Promise<ServiceRecord | null>;
   listServices(filter?: { providerId?: string; enabledOnly?: boolean }): Promise<ServiceRecord[]>;
   deleteService(providerId: string, id: string): Promise<boolean>;

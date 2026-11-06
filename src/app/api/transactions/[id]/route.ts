@@ -1,35 +1,8 @@
-import type { PaymentRequirements } from 'paygate-x402';
 import { NETWORKS } from '@/lib/networks';
+import { auditProof, settlementProof, type PaymentProof } from '@/lib/proof';
 import { apiError, authed, toJson } from '@/server/http/api';
-import { getAdapter } from '@/server/payments/registry';
-import { getStore, type SpendStore, type TransactionRecord } from '@/server/store';
-
-/** Gateway settles in batches, after the receipt was written, so ask again while it is pending. */
-async function refreshSettling(store: SpendStore, transaction: TransactionRecord) {
-  if (transaction.status !== 'settling' || !transaction.reference) return transaction;
-  const network = NETWORKS[transaction.network];
-  const requirement = {
-    scheme: 'exact',
-    network: network.caip2,
-    asset: network.tokenAsset,
-    amount: transaction.amountMicros.toString(),
-    payTo: transaction.payTo,
-    maxTimeoutSeconds: 0,
-    extra: {},
-  } as PaymentRequirements;
-  const confirmation = await getAdapter(transaction.network).confirm({
-    settlement: { success: true, transaction: transaction.reference, network: network.caip2 as PaymentRequirements['network'], payer: transaction.payer ?? undefined },
-    requirement,
-  });
-  // A failed lookup says nothing about the payment, so the receipt stays as it was.
-  if (confirmation.status !== 'verified' && confirmation.status !== 'failed') return transaction;
-  return store.updateTransactionStatus(transaction.id, {
-    status: confirmation.status,
-    statusDetail: confirmation.detail,
-    reference: confirmation.reference,
-    payer: confirmation.payer,
-  });
-}
+import { refreshTransaction } from '@/server/settlement';
+import { getStore } from '@/server/store';
 
 /** Scoped to the signed-in user, so one person's receipt ID is useless to another. */
 export const GET = authed(async (user, _request, { params }: { params: Promise<{ id: string }> }) => {
@@ -38,6 +11,19 @@ export const GET = authed(async (user, _request, { params }: { params: Promise<{
   const transaction = await store.getTransaction(user.id, id);
   if (!transaction) return apiError('Receipt not found.', 404);
   const activity = await store.listActivity(user.id, 500);
-  const usageCode = activity.find((event) => event.eventType === 'usage_code' && event.transactionId === id)?.eventData.code ?? null;
-  return toJson({ ...(await refreshSettling(store, transaction)), usageCode });
+  const events = activity.filter((event) => event.transactionId === id);
+  const usageCode = events.find((event) => event.eventType === 'usage_code')?.eventData.code ?? null;
+  const current = await refreshTransaction(store, transaction);
+  // Read again: a refresh that just settled the payment has published a new audit message.
+  const fresh = current.status === transaction.status ? events : (await store.listActivity(user.id, 50)).filter((event) => event.transactionId === id);
+  const published = fresh.filter((event) => event.eventType === 'hcs_published');
+  const proof: PaymentProof = {
+    settlement: settlementProof(current),
+    audit: published.flatMap((event) => {
+      const { status, sequence, transactionId } = event.eventData as Record<string, string>;
+      return transactionId ? [auditProof(status ?? 'recorded', sequence, transactionId, NETWORKS[current.network].mainnet)] : [];
+    }),
+    auditPending: current.status === 'verified' && published.length > 0 && !published.some((event) => event.eventData.status === 'verified'),
+  };
+  return toJson({ ...current, usageCode, proof });
 });

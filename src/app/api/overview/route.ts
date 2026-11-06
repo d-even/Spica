@@ -1,5 +1,6 @@
 import { integrations, mainnetEnabled, mode, activeNetworks } from '@/server/env';
 import { authed, toJson } from '@/server/http/api';
+import { refreshTransactions } from '@/server/settlement';
 import { getStore } from '@/server/store';
 
 /** Everything the dashboard shows. Spend totals are computed here, never sent by the client. */
@@ -12,6 +13,7 @@ export const GET = authed(async (user) => {
     store.listTransactions(user.id, 30),
     store.listActivity(user.id, 15),
   ]);
+  const current = await refreshTransactions(store, transactions);
   return toJson({
     user: { wallet: user.wallet, demo: user.demo },
     mode: mode(),
@@ -22,7 +24,7 @@ export const GET = authed(async (user) => {
     policy,
     spend,
     approvals,
-    transactions,
+    transactions: current,
     activity,
   });
 });

@@ -1,15 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useApi, type OverviewDto } from '@/components/api';
+import { useApi, useRefreshWhile, type OverviewDto } from '@/components/api';
 import { Card, Empty, ErrorNote, Loading, PageHeader, StatusBadge } from '@/components/ui';
 import { formatUsd } from '@/lib/money';
 import { NETWORKS } from '@/lib/networks';
+import { settlementProof } from '@/lib/proof';
 
 const shorten = (value: string | null) => (value && value.length > 18 ? `${value.slice(0, 8)}…${value.slice(-6)}` : (value ?? 'None'));
 
 export default function Transactions() {
-  const { data, error } = useApi<OverviewDto>('/api/overview');
+  const { data, error, reload } = useApi<OverviewDto>('/api/overview');
+  useRefreshWhile(Boolean(data?.transactions.some((tx) => tx.status === 'settling')), reload);
   if (error) return <ErrorNote>{error}</ErrorNote>;
   if (!data) return <Loading />;
 
@@ -39,7 +41,9 @@ export default function Transactions() {
                   <td className="px-4 py-3 text-ink-2">{tx.providerName}</td>
                   <td className="px-4 py-3 tabular-nums">{formatUsd(tx.amountMicros)}</td>
                   <td className="px-4 py-3 text-ink-2">{NETWORKS[tx.network].label}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-ink-3">{shorten(tx.reference)}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-ink-3">
+                    {settlementProof(tx) ? <a href={settlementProof(tx)!.url} target="_blank" rel="noreferrer" className="text-accent">{shorten(tx.reference)}</a> : shorten(tx.reference)}
+                  </td>
                   <td className="px-4 py-3"><StatusBadge status={tx.status} /></td>
                 </tr>
               ))}
