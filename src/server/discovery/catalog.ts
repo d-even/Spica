@@ -4,7 +4,7 @@ import { NETWORKS, type NetworkId } from '@/lib/networks';
 import { activeNetworks, mode, publicUrl } from '@/server/env';
 import { getStore } from '@/server/store';
 import type { ServiceRecord } from '@/server/store/types';
-import { discover } from './circle';
+import { discover, recentlyDiscovered } from './circle';
 import type { CatalogService } from './types';
 
 /**
@@ -98,6 +98,44 @@ export async function registeredToCatalog(service: ServiceRecord): Promise<Catal
   };
 }
 
+/** Everything PayGate sells itself: built-in demo services and provider-registered APIs. */
+export async function localServices(): Promise<CatalogService[]> {
+  const local = [...builtinServices()];
+  for (const service of await getStore().listServices({ enabledOnly: true })) {
+    const entry = await registeredToCatalog(service);
+    if (entry) local.push(entry);
+  }
+  return local;
+}
+
+/** The same filters Circle discovery applies, for PayGate's own listings. */
+export function filterLocal(
+  services: CatalogService[],
+  input: { query?: string; category?: string; maxUsdPrice?: string; network?: NetworkId },
+) {
+  const cap = input.maxUsdPrice ? Number(input.maxUsdPrice) : null;
+  return services.filter(
+    (service) =>
+      (!input.query || matches(service, input.query)) &&
+      (!input.category || service.category.toUpperCase() === input.category.toUpperCase()) &&
+      (cap === null || (service.listedUsd !== null && Number(service.listedUsd) <= cap)) &&
+      (!input.network || service.offers.some((offer) => offer.network === input.network)),
+  );
+}
+
+/**
+ * Finds a service a person picked in the marketplace. PayGate listings are read
+ * fresh from the store; Circle listings must have been seen by this server recently.
+ */
+export async function resolveService(id: string): Promise<CatalogService | null> {
+  if (isBuiltinId(id)) return builtinServices().find((service) => service.id === id) ?? null;
+  if (!id.startsWith('cat_')) {
+    const record = await getStore().getService(id).catch(() => null);
+    return record?.enabled ? registeredToCatalog(record) : null;
+  }
+  return recentlyDiscovered(id);
+}
+
 const matches = (service: CatalogService, query: string) =>
   query
     .toLowerCase()
@@ -107,12 +145,7 @@ const matches = (service: CatalogService, query: string) =>
 
 /** PayGate services first, then the Circle catalog filtered to payable networks. */
 export async function findServices(input: { query: string; category?: string; maxUsdPrice?: string; limit?: number }) {
-  const local = [...builtinServices()];
-  const registered = await getStore().listServices({ enabledOnly: true });
-  for (const service of registered) {
-    const entry = await registeredToCatalog(service);
-    if (entry) local.push(entry);
-  }
+  const local = await localServices();
   const relevant = input.query ? local.filter((service) => matches(service, input.query)) : local;
 
   const live = activeNetworks().filter((network) => network !== 'demo');
