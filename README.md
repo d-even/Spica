@@ -1,4 +1,4 @@
-# PayGate
+# SPICA
 
 A spending firewall and payment layer for AI agents. You ask for something in plain language. The agent finds a paid API, your spending rules decide whether it can pay, and you get the result with a receipt.
 
