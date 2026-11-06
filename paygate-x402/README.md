@@ -1,150 +1,194 @@
 # paygate-x402
 
-Stripe for x402 — Add payments to any API in 3 lines.
+Framework-neutral [x402 v2](https://github.com/coinbase/x402) seller middleware. Wrap any handler that takes a Web `Request` and returns a `Response`, and it only runs after a verified payment. The buyer is only charged when the handler succeeds.
 
-## Install
+It runs anywhere Web `Request`/`Response` exist: Next.js route handlers, Hono, Bun, Deno and Cloudflare Workers. Express and Fastify handlers use Node's `req`/`res` objects, so they need a bridge first.
 
-```bash
-npm install paygate-x402
-```
-
-## Express Usage
-
-```javascript
-import paygate from 'paygate-x402';
-
-app.use(paygate({
-  apiKey: 'pg_your_key',
-  price: '0.001',
-  payTo: '0xYourWallet'
-}));
-```
-
-## Next.js Usage
-
-```typescript
-import { paygateNext } from 'paygate-x402';
-
-export async function GET(request: Request) {
-  const check = await paygateNext(request, {
-    apiKey: 'pg_your_key',
-    price: '0.001',
-    payTo: '0xYourWallet'
-  });
-  
-  if (check) return check;
-  
-  // Your API logic here
-  return Response.json({ data: 'Protected content' });
-}
-```
+The middleware only knows the protocol. Everything specific to a network lives in a `SellerAdapter` you pass in.
 
 ## How it works
 
-1. Request comes in
-2. No payment? → 402 returned automatically
-3. Payment header found? → Verified on Base Sepolia
-4. Verified? → API access granted
+| Incoming request | What happens |
+| --- | --- |
+| No payment header | `402` with a `PAYMENT-REQUIRED` header and JSON body listing every offer |
+| Header present | Decode it, then check it matches one current offer exactly (scheme, network, amount, asset, `payTo`) |
+| Matches | Claim the proof with the replay guard, then `adapter.verify` |
+| Verified | Run your handler |
+| Handler returns non-`2xx` | Return that response. Nothing is settled and the buyer is not charged |
+| Handler succeeds | `adapter.settle`, then return your response with a `PAYMENT-RESPONSE` header |
+| Anything fails before settlement | The replay claim is released so the buyer can retry |
 
-Built on Base Sepolia. Payments in USDC.
+The proof is read from `PAYMENT-SIGNATURE`, with `X-PAYMENT` accepted as a fallback.
 
-## Features
+## Install
 
-- ✅ 3-line integration
-- ✅ On-chain payment verification
-- ✅ ERC-20 Transfer event decoding
-- ✅ Works with Express and Next.js
-- ✅ AI agent compatible
-- ✅ TypeScript support
+This version is not published to npm, so use it from source. A `paygate-x402` package on npm may be an older, incompatible version.
 
-## Configuration
+1. Copy `src/index.ts` into your project, or point a TypeScript path alias at it, as the PayGate app does:
 
-```typescript
-interface PaygateConfig {
-  apiKey: string;      // Your PayGate API key
-  price: string;       // Price in USDC (e.g., '0.001')
-  payTo: string;       // Your wallet address
-  token?: string;      // Token address (default: USDC)
-  network?: string;    // Network (default: 'base-sepolia')
-}
-```
+   ```jsonc
+   // tsconfig.json
+   { "compilerOptions": { "paths": { "paygate-x402": ["./paygate-x402/src/index.ts"] } } }
+   ```
 
-## Payment Header Format
+2. Install the peer dependency:
 
-Clients must include payment proof in the `X-Payment` header:
+   ```bash
+   npm install @x402/core
+   ```
 
-```
-X-Payment: txHash=0x...;from=0x...;to=0x...;amount=0.001;token=0x...;network=base-sepolia
-```
+## Usage
 
-## Example: Protected API
+### Next.js route handler
 
-```typescript
-import express from 'express';
-import paygate from 'paygate-x402';
+```ts
+// app/api/weather/route.ts
+import { withPayment } from 'paygate-x402';
+import { arcTestnet } from '@/payments/arc';
+import { replayGuard } from '@/payments/replay';
 
-const app = express();
-
-// Protect this route
-app.get('/api/data', 
-  paygate({
-    apiKey: 'pg_your_key',
-    price: '0.001',
-    payTo: '0xA1B320D8061357efa286Af2629DF6AC554C05d6E'
-  }),
-  (req, res) => {
-    res.json({ data: 'This is protected content!' });
-  }
+export const GET = withPayment(
+  async (request, { payer }) => {
+    const city = new URL(request.url).searchParams.get('city') ?? 'London';
+    return Response.json({ city, tempC: 18, payer });
+  },
+  {
+    offers: [{ adapter: arcTestnet, amountAtomic: '10000', payTo: '0xYourWallet' }], // $0.01
+    replayGuard,
+    description: 'Current weather by city',
+    onEvent: (event) => console.log('payment event', event.type),
+  },
 );
-
-app.listen(3000);
 ```
 
-## Example: AI Agent Client
+### Hono
 
-```typescript
-// 1. Call API
-const response = await fetch('https://api.example.com/data');
+```ts
+import { Hono } from 'hono';
+import { withPayment } from 'paygate-x402';
 
-// 2. Got 402? Pay with USDC
-if (response.status === 402) {
-  const { payment } = await response.json();
-  
-  // Send USDC on Base Sepolia
-  const txHash = await sendUSDC(payment.payTo, payment.amount);
-  
-  // 3. Retry with payment proof
-  const response2 = await fetch('https://api.example.com/data', {
-    headers: {
-      'X-Payment': `txHash=${txHash};from=${myAddress};to=${payment.payTo};amount=${payment.amount};token=${payment.token};network=base-sepolia`
-    }
-  });
-  
-  const data = await response2.json();
+const paidWeather = withPayment(async () => Response.json({ tempC: 18 }), { offers, replayGuard });
+
+const app = new Hono();
+app.get('/weather', (c) => paidWeather(c.req.raw));
+export default app;
+```
+
+### Several networks
+
+List one offer per network. The buyer picks the one it can pay:
+
+```ts
+offers: [
+  { adapter: arcTestnet, amountAtomic: '10000', payTo: '0xYourEvmWallet' },
+  { adapter: hederaTestnet, amountAtomic: '10000', payTo: '0.0.1234' },
+],
+```
+
+USDC has 6 decimals, so `amountAtomic` is the price in millionths of a dollar: `'10000'` is $0.01.
+
+## Adapters
+
+```ts
+interface SellerAdapter {
+  readonly network: string; // CAIP-2, e.g. 'eip155:5042002' or 'hedera:testnet'
+  buildRequirement(input: { amountAtomic: string; payTo: string }): Promise<PaymentRequirements>;
+  verify(payload: PaymentPayload, requirement: PaymentRequirements): Promise<VerifyResponse>;
+  settle(payload: PaymentPayload, requirement: PaymentRequirements): Promise<SettleResponse>;
 }
 ```
 
-## Network Details
+### Arc testnet through Circle Gateway
 
-- **Network:** Base Sepolia (testnet)
-- **Chain ID:** 84532
-- **USDC Contract:** `0x036CbD53842c5426634e7929541eC2318f3dCF7e`
-- **RPC:** `https://sepolia.base.org`
+This is a cut-down version of PayGate's [`src/server/payments/arc.ts`](../src/server/payments/arc.ts). It needs `npm install @circle-fin/x402-batching`.
 
-## Get Test USDC
+```ts
+// payments/arc.ts
+import { CHAIN_CONFIGS } from '@circle-fin/x402-batching/client';
+import { BatchFacilitatorClient } from '@circle-fin/x402-batching/server';
+import { CIRCLE_BATCHING_NAME, CIRCLE_BATCHING_VERSION } from '@circle-fin/x402-batching';
+import type { PaymentRequirements, SellerAdapter, SettleResponse } from 'paygate-x402';
 
-Visit: https://www.coinbase.com/faucets/base-ethereum-sepolia-faucet
+const facilitator = new BatchFacilitatorClient({ url: 'https://gateway-api-testnet.circle.com' });
+
+export const arcTestnet: SellerAdapter = {
+  network: 'eip155:5042002',
+  async buildRequirement({ amountAtomic, payTo }) {
+    return {
+      scheme: 'exact',
+      network: 'eip155:5042002',
+      asset: '0x3600000000000000000000000000000000000000', // USDC on Arc
+      amount: amountAtomic,
+      payTo,
+      maxTimeoutSeconds: 604_900, // Gateway authorizations must stay valid for 7 days
+      extra: {
+        name: CIRCLE_BATCHING_NAME,
+        version: CIRCLE_BATCHING_VERSION,
+        verifyingContract: CHAIN_CONFIGS.arcTestnet.gatewayWallet,
+      },
+    } as PaymentRequirements;
+  },
+  verify: (payload, requirement) => facilitator.verify(payload as never, requirement as never),
+  settle: (payload, requirement) =>
+    facilitator.settle(payload as never, requirement as never) as Promise<SettleResponse>,
+};
+```
+
+Gateway's `verify` checks the signature, not the buyer's balance. That is why the middleware settles before it releases data.
+
+For Hedera, see [`src/server/payments/hedera.ts`](../src/server/payments/hedera.ts), which uses an x402 facilitator.
+
+## Replay guard
+
+```ts
+interface ReplayGuard {
+  claim(proofId: string): Promise<boolean>; // atomically claim; false if already used
+  release(proofId: string): Promise<void>;  // called when no money moved, so the buyer can retry
+}
+```
+
+For local development, an in-memory set is enough:
+
+```ts
+const used = new Set<string>();
+export const replayGuard = {
+  async claim(id: string) { if (used.has(id)) return false; used.add(id); return true; },
+  async release(id: string) { used.delete(id); },
+};
+```
+
+In production, use a database unique key so the guard holds across instances and restarts. For example, in Postgres:
+
+```ts
+// create table used_proofs (id text primary key, created_at timestamptz default now());
+export const replayGuard = {
+  async claim(id: string) {
+    const rows = await sql`insert into used_proofs (id) values (${id}) on conflict do nothing returning id`;
+    return rows.length === 1;
+  },
+  async release(id: string) {
+    await sql`delete from used_proofs where id = ${id}`;
+  },
+};
+```
+
+## Events
+
+`onEvent` sees every outcome. Errors thrown inside it never change the response.
+
+| `type` | Fields |
+| --- | --- |
+| `payment_required` | none |
+| `rejected` | `reason`, `network?` |
+| `handler_failed` | `status`, `network` |
+| `settled` | `settlement`, `requirement`, `latencyMs` |
+
+Rejection reasons come from the middleware (`invalid_payment_header`, `requirement_mismatch`, `duplicate_payment`) or from the adapter's verify and settle results.
+
+## Exports
+
+`withPayment`, `requirementsMatch`, `proofId`, `X402_VERSION`, and the types `SellerAdapter`, `ReplayGuard`, `PaymentOffer`, `WithPaymentOptions`, `PaymentEvent`, plus the x402 core types it re-exports.
 
 ## License
 
 MIT
-
-## Links
-
-- **GitHub:** https://github.com/dhruvxop19/paygate
-- **Documentation:** https://github.com/dhruvxop19/paygate/blob/main/README.md
-- **x402 Protocol:** https://github.com/coinbase/x402
-
----
-
-Built with ❤️ using the x402 protocol by Coinbase

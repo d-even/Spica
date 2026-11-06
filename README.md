@@ -130,18 +130,168 @@ All routes except `/api/x402/*` and `/api/auth/*` need a signed-in session. Iden
 | `GET /api/x402/:serviceId` | A paid resource, using x402 v2 |
 | `POST /api/auth/otp`, `/verify`, `/logout` | Sign-in |
 
-## Using the middleware
+## Integrating PayGate
+
+There are four ways in, depending on which side of the payment you are on.
+
+| You want to | Use | Code to write |
+| --- | --- | --- |
+| Charge for an API you already run, without changing it | [Provider dashboard](#1-sell-an-existing-api-through-paygate-no-code) | None |
+| Charge for routes inside your own server | [`paygate-x402` middleware](#2-add-payments-to-your-own-server) | A few lines plus an adapter |
+| Let your app or agent buy data within spending limits | [PayGate HTTP API](#3-buy-through-paygate-from-your-app-or-agent) | An HTTP client |
+| Pay a PayGate-hosted API from your own x402 client | [`/api/x402/:serviceId`](#4-pay-paygate-services-from-any-x402-client) | An x402 v2 client |
+
+You can also [reuse the policy engine](#reusing-the-firewall-in-your-own-agent) on its own.
+
+### 1. Sell an existing API through PayGate (no code)
+
+PayGate hosts the paywall and proxies paid requests to your API.
+
+1. Sign in and open `/provider`.
+2. Fill in your provider profile:
+   - **Wallet address**: the EVM address that receives USDC on Arc.
+   - **ENS name** (optional): it must resolve to that wallet. Buyers check it before every payment and refuse to pay on a mismatch.
+   - **Hedera account** (optional): needed if you accept Hedera, in the form `0.0.1234`.
+   - **PayGate ID** (optional): a free `yourname.paygate.eth` subdomain.
+3. Register a service with a name, description, public endpoint URL, price in USD (for example `0.02`) and the networks you accept.
+
+Your API is then served at `GET /api/x402/<serviceId>` and appears in the marketplace and in agent discovery. For each call PayGate:
+
+1. Returns `402` with your price and wallet.
+2. Verifies the buyer's payment.
+3. Calls your endpoint.
+4. Settles only if your endpoint returned a `2xx`, then passes your response back.
+
+If your API fails, nobody is charged. Sales, failures and measured reputation show on the provider dashboard.
+
+The same steps work over HTTP. Authenticate as described in [section 3](#3-buy-through-paygate-from-your-app-or-agent), then:
+
+```bash
+curl -X PUT  "$PAYGATE/api/provider" -b cookies.txt -H 'content-type: application/json' \
+  -d '{"name":"Acme Data","walletAddress":"0xYourWallet","ensName":"acme.eth"}'
+
+curl -X POST "$PAYGATE/api/provider/services" -b cookies.txt -H 'content-type: application/json' \
+  -d '{"name":"Acme weather","description":"Current weather by city","endpoint":"https://api.acme.com/weather",
+       "category":"Weather","price":"0.01","supportedNetworks":["arc-testnet"]}'
+```
+
+Requirements for your endpoint:
+
+- It must be a public `https` URL that answers `GET` with JSON. PayGate refuses private and internal addresses.
+- PayGate calls it without credentials. Anyone who learns the URL can call it for free, so use a URL that is hard to guess, or protect it yourself with [option 2](#2-add-payments-to-your-own-server).
+- Query parameters sent by buyers are not yet forwarded to your endpoint (see [Known limits](#known-limits)).
+
+### 2. Add payments to your own server
+
+[`paygate-x402`](paygate-x402/) is x402 v2 seller middleware that works on Web `Request` and `Response`. It runs in Next.js route handlers, Hono, Bun, Deno and Cloudflare Workers. Express and Fastify handlers use Node's `req`/`res` objects, so they need a bridge to Web `Request`/`Response` first.
 
 ```ts
 import { withPayment } from 'paygate-x402';
 
-export const GET = withPayment(async () => Response.json({ data: 'paid content' }), {
-  offers: [{ adapter: arcAdapter, amountAtomic: '20000', payTo: sellerAddress }],
-  replayGuard,
-});
+export const GET = withPayment(
+  async (request, { payer }) => Response.json({ data: 'paid content', payer }),
+  {
+    offers: [{ adapter: arcTestnet, amountAtomic: '10000', payTo: '0xYourWallet' }], // 10000 = $0.01 USDC
+    replayGuard,
+    description: 'Current weather by city',
+  },
+);
 ```
 
-Write a `SellerAdapter` to add a network. The middleware only knows the protocol.
+You supply:
+
+- An **adapter** for each network you accept. It builds the price quote, verifies the buyer's proof and settles the payment.
+- A **replay guard**, so one signed payment cannot unlock the resource twice.
+
+Install and build steps, a working Arc adapter, a production replay guard and a Hono example are in [`paygate-x402/README.md`](paygate-x402/README.md). This repo's adapters are full references: [`arc.ts`](src/server/payments/arc.ts) and [`hedera.ts`](src/server/payments/hedera.ts).
+
+Any x402 v2 buyer can pay you, including PayGate's agent, if your API is in the marketplace.
+
+### 3. Buy through PayGate from your app or agent
+
+Run PayGate (demo or live) and drive it over HTTP. Your app sends a plain-language request, and PayGate discovers, pays within your policy and returns the answer. Your app never holds a wallet key.
+
+**Sign in.** In demo mode without Supabase, no sign-in is needed and everyone shares one demo user. With Supabase, use the email code flow. It sets an httpOnly `paygate_session` cookie, which you send with later calls:
+
+```bash
+curl -X POST "$PAYGATE/api/auth/otp"    -H 'content-type: application/json' -d '{"email":"you@example.com"}'
+curl -X POST "$PAYGATE/api/auth/verify" -H 'content-type: application/json' -c cookies.txt \
+  -d '{"email":"you@example.com","token":"123456"}'
+```
+
+**Set your limits.** Amounts are USD strings:
+
+```bash
+curl -X PUT "$PAYGATE/api/policy" -b cookies.txt -H 'content-type: application/json' -d '{
+  "perRequestLimit":"0.50","dailyLimit":"1.00","monthlyLimit":"10.00","approvalThreshold":"0.20",
+  "autoPayEnabled":true,"allowedNetworks":["arc-testnet"],"allowedProviders":[],"blockedProviders":[]}'
+```
+
+**Run the agent.** The response streams newline-delimited JSON events:
+
+```ts
+const res = await fetch(`${PAYGATE}/api/agent/run`, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json', cookie },
+  body: JSON.stringify({ message: 'Latest cricket scores, spend at most 10 cents' }),
+});
+
+const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader();
+let buffer = '';
+for (;;) {
+  const { value, done } = await reader.read();
+  if (done) break;
+  buffer += value;
+  const lines = buffer.split('\n');
+  buffer = lines.pop()!;
+  for (const line of lines.filter(Boolean)) {
+    const event = JSON.parse(line);
+    if (event.type === 'approval_required') console.log('Needs approval:', event.approvalId, event.amount);
+    if (event.type === 'receipt') console.log('Paid:', event.transaction);
+    if (event.type === 'answer') console.log(event.text);
+  }
+}
+```
+
+Event types are `status`, `budget`, `discovered`, `selected`, `quote`, `identity`, `policy`, `payment`, `receipt`, `approval_required`, `data`, `answer` and `error`. See `AgentEvent` in [`session.ts`](src/server/agent/session.ts).
+
+**Approve held payments.** When a payment is above your approval threshold, the run stops with `approval_required`. A person approves or rejects it. Approval re-runs the purchase, and the hard limits are checked again:
+
+```bash
+curl -X POST "$PAYGATE/api/approvals/<approvalId>" -b cookies.txt -H 'content-type: application/json' \
+  -d '{"decision":"approved"}'
+```
+
+Read a receipt with `GET /api/transactions/:id`. The full route list is under [API](#api). Agent runs are limited to 10 per minute per user.
+
+### 4. Pay PayGate services from any x402 client
+
+`GET /api/x402/:serviceId` is a standard x402 v2 resource. The built-in services are `cricket-live` and `cricket-pro`, and registered services use their own IDs.
+
+1. Call it with no payment. You get `402` with a `PAYMENT-REQUIRED` header listing the accepted networks, asset, amount and `payTo`.
+2. Retry with a signed proof in `PAYMENT-SIGNATURE`. `X-PAYMENT` is also accepted.
+3. On success the data comes back with a `PAYMENT-RESPONSE` header holding the settlement.
+
+Use any x402 v2 client that supports the network: Circle Gateway's batching client for Arc, or `@x402/hedera` for Hedera. Payments made this way skip PayGate's buyer firewall, because the firewall protects purchases made through PayGate.
+
+### Reusing the firewall in your own agent
+
+`evaluatePolicy` in [`policy.ts`](src/server/firewall/policy.ts) is a pure function with no I/O. It only depends on `src/lib/networks.ts` and `src/lib/money.ts`, so you can copy it into another agent:
+
+```ts
+import { evaluatePolicy, DEFAULT_POLICY } from './firewall/policy';
+
+const decision = evaluatePolicy(
+  { ...DEFAULT_POLICY, userId: 'u1' },
+  { amountMicros: 20_000n, asset: '0x3600000000000000000000000000000000000000', network: 'arc-testnet',
+    providerKey: 'acme', listedAmountMicros: 20_000n, identityStatus: 'match' },
+  { spentTodayMicros: 0n, spentThisMonthMicros: 0n, spentThisTaskMicros: 0n },
+  { mainnetEnabled: false },
+);
+// { outcome: 'allow' | 'needs_approval' | 'deny', reason, code? }
+```
+
+On its own it cannot stop two concurrent requests from both passing. Pair it with an atomic reservation, like `SpendStore.reserve` in [`src/server/store/`](src/server/store/). Call the model only after the decision is made, never as part of it.
 
 ## Testing
 
@@ -172,5 +322,5 @@ Write a `SellerAdapter` to add a network. The middleware only knows the protocol
 - ENS shows identity only. It says nothing about the quality of an API.
 - Reputation is computed from calls made through this PayGate deployment.
 - Provider revenue counts sales reported by PayGate's seller route.
-#   P a y G a t e  
- 
+- The seller route does not yet forward a buyer's query parameters to a registered provider's endpoint.
+- `paygate-x402` is not published to npm yet. Use it from source.
