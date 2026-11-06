@@ -17,6 +17,8 @@ Open http://localhost:3000/agent and choose **Try the cricket example**.
 
 With no configuration, PayGate runs in **demo mode**: no keys, no money, data in memory. It runs the real HTTP 402 handshake and the real firewall with a simulated payment rail. Everything it produces is labelled **Simulated**, and discovery still uses the live marketplace.
 
+For how it works inside, see the [documentation](docs/README.md).
+
 ## What it does
 
 - **AI agent:** Claude plans each request through three tools, with a labelled fixed planner when no key is set.
