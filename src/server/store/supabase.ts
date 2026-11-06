@@ -286,6 +286,19 @@ export class SupabaseStore implements SpendStore {
     );
   }
 
+  async updateTransactionStatus(id: string, update: Pick<TransactionRecord, 'status' | 'statusDetail' | 'reference' | 'payer'>) {
+    return toTransaction(
+      must(
+        await this.db
+          .from('transactions')
+          .update({ status: update.status, status_detail: update.statusDetail, reference: update.reference, payer: update.payer })
+          .eq('id', id)
+          .select()
+          .single(),
+      ),
+    );
+  }
+
   async getTransaction(userId: string, id: string) {
     const row = maybe(await this.db.from('transactions').select('*').eq('id', id).eq('user_id', userId).maybeSingle());
     return row ? toTransaction(row) : null;

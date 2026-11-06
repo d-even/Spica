@@ -148,6 +148,10 @@ export interface SpendStore {
   decideApproval(userId: string, id: string, decision: 'approved' | 'rejected'): Promise<ApprovalRecord | null>;
 
   insertTransaction(record: Omit<TransactionRecord, 'id' | 'createdAt'>): Promise<TransactionRecord>;
+  updateTransactionStatus(
+    id: string,
+    update: Pick<TransactionRecord, 'status' | 'statusDetail' | 'reference' | 'payer'>,
+  ): Promise<TransactionRecord>;
   getTransaction(userId: string, id: string): Promise<TransactionRecord | null>;
   listTransactions(userId: string, limit?: number): Promise<TransactionRecord[]>;
   listTransactionsForServices(serviceIds: string[], limit?: number): Promise<TransactionRecord[]>;

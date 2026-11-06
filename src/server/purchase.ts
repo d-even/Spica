@@ -65,6 +65,10 @@ export function parsePaymentRequired(headers: Headers, body: string): PaymentReq
   }
 }
 
+/** Networks this deployment can pay on and the person allows. Demo is never a policy choice. */
+export const payableNetworks = (active: NetworkId[], allowed: NetworkId[]) =>
+  active.filter((network) => network === 'demo' || allowed.includes(network));
+
 /** Cheapest offer this deployment can pay. Network filtering happens before the firewall sees it. */
 export function selectRequirement(paymentRequired: PaymentRequired, networks: NetworkId[]) {
   const payable = paymentRequired.accepts.flatMap((requirement) => {
@@ -124,10 +128,11 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
     await observe({ reachable: true, succeeded: false, paid: false });
     return { outcome: 'failed', reason: 'The service sent payment terms PayGate could not read.' };
   }
-  const selected = selectRequirement(paymentRequired, activeNetworks());
+  const policy = await store.getPolicy(userId);
+  const selected = selectRequirement(paymentRequired, payableNetworks(activeNetworks(), policy.allowedNetworks));
   if (!selected) {
     await observe({ reachable: true, succeeded: false, paid: false });
-    return { outcome: 'denied', code: 'network_not_allowed', reason: 'The service does not accept any network enabled here.' };
+    return { outcome: 'denied', code: 'network_not_allowed', reason: 'The service does not accept any network allowed here.' };
   }
   const { requirement, network } = selected;
   const amountMicros = BigInt(requirement.amount);
@@ -152,7 +157,6 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
     taskBudgetMicros: context.taskBudgetMicros,
     identityStatus: identity.status,
   };
-  const policy = await store.getPolicy(userId);
   const decision = evaluatePolicy(policy, paymentRequest, await store.getSpendState(userId, taskId), {
     mainnetEnabled: mainnetEnabled(),
     humanApproved,
