@@ -44,7 +44,6 @@ export const PUT = authed(async (user, request) => {
   const provider = await getStore().saveProvider({
     ownerUserId: user.id,
     name: input.name,
-    email: user.email,
     ensName,
     walletAddress: input.walletAddress,
     hederaAccount: input.hederaAccount || null,

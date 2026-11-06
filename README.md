@@ -19,7 +19,7 @@ With no configuration, PayGate runs in **demo mode**: no keys, no money, data in
 
 ## What it does
 
-- **AI agent:** Claude plans each request through three tools, with a labelled fixed planner when no key is set.
+- **AI agent:** Gemini plans each request through three tools, with a labelled fixed planner when no key is set.
 - **Spending Firewall:** per-request, daily, monthly and per-task limits, provider allowlist and blocklist, network permissions, an approval threshold, and an automatic-payment switch.
 - **Discovery:** the live Circle Agent Marketplace, plus services registered on PayGate.
 - **Payments:** Arc USDC through Circle Gateway nanopayments, and Hedera USDC through an x402 facilitator, behind one adapter interface.
@@ -32,7 +32,7 @@ With no configuration, PayGate runs in **demo mode**: no keys, no money, data in
 
 ```mermaid
 flowchart TD
-    U[Person] --> A[Agent: Claude or demo planner]
+    U[Person] --> A[Agent: Gemini or demo planner]
     A -->|discover, inspect| C[Catalog]
     C --> CM[Circle Agent Marketplace]
     C --> PG[PayGate services]
@@ -60,7 +60,7 @@ flowchart TD
 | `src/server/signer/` | The only code that reads buyer keys, and the only path to a signature |
 | `src/server/payments/` | `PaymentAdapter` with Arc, Hedera and demo implementations |
 | `src/server/purchase.ts` | The buyer flow from quote to receipt |
-| `src/server/agent/` | Claude tool loop, demo planner and budget parsing |
+| `src/server/agent/` | Gemini tool loop, demo planner and budget parsing |
 | `src/server/discovery/` | Circle catalog client and PayGate services |
 
 ## Payment flow
@@ -83,9 +83,9 @@ Receipt statuses are **Verified** (settled and confirmed), **Settling** (accepte
 ## Going live on testnet
 
 1. Copy `.env.example` to `.env.local`.
-2. Create a Supabase project. Review `supabase/migrations/20261105000000_spending_firewall.sql` against any existing tables, then apply it.
-3. In Supabase Auth, edit the magic link email template to include `{{ .Token }}`, since sign-in uses a typed code.
-4. Add `ANTHROPIC_API_KEY`.
+2. Create a Supabase project. Review the files in `supabase/migrations/` against any existing tables, then apply them in filename order.
+3. Set `PAYGATE_SESSION_SECRET` to a random value of at least 32 characters. People sign in with an Ethereum browser wallet (EOA), using Sign-In with Ethereum.
+4. Add `GEMINI_API_KEY`.
 5. Create a new EOA wallet for the agent and set `AGENT_PRIVATE_KEY`. Set `PAYGATE_SELLER_ADDRESS` to a different wallet.
 6. Get Arc testnet USDC from https://faucet.circle.com, then move it into Gateway:
 
@@ -128,7 +128,7 @@ All routes except `/api/x402/*` and `/api/auth/*` need a signed-in session. Iden
 | `POST /api/provider/services` | Register an API |
 | `DELETE /api/provider/services/:id` | Remove your API |
 | `GET /api/x402/:serviceId` | A paid resource, using x402 v2 |
-| `POST /api/auth/otp`, `/verify`, `/logout` | Sign-in |
+| `POST /api/auth/challenge`, `/verify`, `/logout` | Wallet sign-in |
 
 ## Using the middleware
 

@@ -192,7 +192,7 @@ export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean
               <Card
                 title="Answer"
                 className="rise"
-                action={answer.source === 'demo' ? <Badge tone="warn">Demo planner</Badge> : <Badge tone="info">Claude</Badge>}
+                action={answer.source === 'demo' ? <Badge tone="warn">Demo planner</Badge> : <Badge tone="info">Gemini</Badge>}
               >
                 <p className="whitespace-pre-wrap text-sm leading-relaxed">{answer.text}</p>
                 {data && (

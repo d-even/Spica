@@ -102,7 +102,7 @@ export interface IntegrationDto {
 }
 
 export interface OverviewDto {
-  user: { email: string; demo: boolean };
+  user: { wallet: string | null; demo: boolean };
   mode: 'demo' | 'live';
   mainnetEnabled: boolean;
   store: 'memory' | 'supabase';

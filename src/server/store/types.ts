@@ -94,7 +94,6 @@ export interface ProviderRecord {
   id: string;
   ownerUserId: string;
   name: string;
-  email: string;
   ensName: string | null;
   walletAddress: string;
   hederaAccount: string | null;

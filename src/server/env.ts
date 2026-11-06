@@ -14,8 +14,13 @@ export const publicUrl = () => (process.env.PAYGATE_PUBLIC_URL ?? 'http://localh
 export const supabaseConfig = () => {
   const url = process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-  return url && serviceRoleKey && anonKey ? { url, serviceRoleKey, anonKey } : null;
+  return url && serviceRoleKey ? { url, serviceRoleKey } : null;
+};
+
+/** Signs session cookies. Anyone holding it can act as any wallet, so short values are refused. */
+export const sessionSecret = () => {
+  const secret = process.env.PAYGATE_SESSION_SECRET;
+  return secret && secret.length >= 32 ? secret : null;
 };
 
 export interface Integration {
@@ -42,8 +47,16 @@ export function integrations(): Integration[] {
       configured: true,
       missing: [],
     },
-    check('llm', 'Claude', 'Understands requests and plans the agent run.', ['ANTHROPIC_API_KEY']),
-    check('supabase', 'Supabase', 'Durable data and sign-in.', ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY']),
+    check('llm', 'Gemini', 'Understands requests and plans the agent run.', ['GEMINI_API_KEY']),
+    check('supabase', 'Supabase', 'Durable data.', ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']),
+    {
+      id: 'sign-in',
+      label: 'Wallet sign-in',
+      purpose: 'Signs session cookies. Needs at least 32 characters.',
+      configured: sessionSecret() !== null,
+      missing: sessionSecret() ? [] : ['PAYGATE_SESSION_SECRET'],
+      optional: true,
+    },
     check('arc', 'Arc payments', 'USDC nanopayments through Circle Gateway.', ['AGENT_PRIVATE_KEY']),
     check('seller', 'Arc seller', 'Receives payments for the built-in cricket services.', ['PAYGATE_SELLER_ADDRESS'], true),
     check(

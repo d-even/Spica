@@ -17,7 +17,7 @@ export function getStore(): SpendStore {
   } else if (mode() === 'demo') {
     globals.paygateStore = new MemoryStore();
   } else {
-    throw new Error('Live mode needs Supabase. Set SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY.');
+    throw new Error('Live mode needs Supabase. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
   }
   return globals.paygateStore;
 }

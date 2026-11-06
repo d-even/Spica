@@ -57,7 +57,7 @@ export default function Settings() {
 
         {!data.user.demo && (
           <Card title="Account">
-            <p className="mb-3 text-sm text-ink-2">{data.user.email}</p>
+            <p className="mb-3 break-all font-mono text-sm text-ink-2">{data.user.wallet}</p>
             <Button variant="ghost" onClick={signOut}>Sign out</Button>
           </Card>
         )}

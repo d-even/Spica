@@ -74,7 +74,6 @@ const toProvider = (row: Row): ProviderRecord => ({
   id: row.id,
   ownerUserId: row.owner_user_id,
   name: row.name ?? '',
-  email: row.email,
   ensName: row.ens_name,
   walletAddress: row.wallet_address,
   hederaAccount: row.hedera_account,
@@ -368,7 +367,8 @@ export class SupabaseStore implements SpendStore {
             {
               owner_user_id: record.ownerUserId,
               name: record.name,
-              email: record.email,
+              // Legacy NOT NULL column. Wallet accounts have no email.
+              email: '',
               ens_name: record.ensName,
               wallet_address: record.walletAddress,
               hedera_account: record.hederaAccount,

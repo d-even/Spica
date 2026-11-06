@@ -1,20 +1,25 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { authClient, setSession } from '@/server/auth';
-import { supabaseConfig } from '@/server/env';
+import { setSession, signInSecret, takeChallengeNonce } from '@/server/auth';
+import { publicUrl } from '@/server/env';
 import { apiError } from '@/server/http/api';
-import { allowRequest } from '@/server/http/rate-limit';
+import { verifyChallenge } from '@/server/wallet-auth';
 
-const body = z.object({ email: z.string().email(), token: z.string().trim().min(6).max(10) });
+const body = z.object({
+  message: z.string().min(1).max(2_000),
+  signature: z.custom<`0x${string}`>((value) => typeof value === 'string' && /^0x[0-9a-fA-F]+$/.test(value)),
+});
 
 export async function POST(request: Request) {
-  if (!supabaseConfig()) return apiError('Sign-in is not configured.', 503);
+  const secret = signInSecret();
+  if (!secret) return apiError('Sign-in is not configured.', 503);
   const parsed = body.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return apiError('Enter the code from your email.', 400);
-  if (!allowRequest(`verify:${parsed.data.email}`, 10, 10 * 60_000)) return apiError('Too many attempts. Try again later.', 429);
+  if (!parsed.success) return apiError('That signature is not valid.', 400);
 
-  const { data, error } = await authClient().auth.verifyOtp({ ...parsed.data, type: 'email' });
-  if (error || !data.session) return apiError('That code is not valid.', 401);
-  await setSession(data.session.access_token, data.session.expires_in);
+  const nonce = await takeChallengeNonce(secret);
+  if (!nonce) return apiError('This sign-in request expired. Try again.', 401);
+  const wallet = await verifyChallenge({ ...parsed.data, nonce, domain: new URL(publicUrl()).host });
+  if (!wallet) return apiError('That signature is not valid.', 401);
+  await setSession(wallet, secret);
   return NextResponse.json({ signedIn: true });
 }
