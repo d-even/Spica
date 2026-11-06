@@ -108,4 +108,8 @@ RLS is on for every table, with **no policies**. The browser never talks to thes
 
 ### Applying it
 
-Review the migration against any existing tables first, then apply it with the Supabase CLI or SQL editor. If Supabase sends the sign-in emails, also edit its magic link email template to include `{{ .Token }}`, because sign-in uses a typed code. With Resend configured, PayGate sends its own email and the template is not used. See [Configuration](configuration.md#sign-in-email-optional).
+Review the migration against any existing tables first, then apply it with the Supabase CLI or SQL editor. Supabase Auth is not used: people sign in with a wallet, and PayGate keeps its own signed session cookie.
+
+### User IDs
+
+A user ID is derived from the signed-in wallet: SHA-256 of `paygate:evm:<lowercase address>`, formatted as a UUID. The same wallet always gets the same ID, and the existing `uuid` columns accept it without a migration. The shared demo user is `00000000-0000-4000-8000-000000000001`. Data saved under earlier Supabase Auth user IDs is not linked to wallets.

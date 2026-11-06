@@ -55,9 +55,17 @@ export default function Settings() {
           </ul>
         </Card>
 
+        {data.user.demo && (
+          <Card title="Account">
+            <p className="mb-3 text-sm text-ink-2">You are using the shared demo account. Sign in with a wallet to keep your own settings and payments.</p>
+            <Button variant="ghost" onClick={() => router.push('/login')}>Sign in with a wallet</Button>
+          </Card>
+        )}
+
         {!data.user.demo && (
           <Card title="Account">
-            <p className="mb-3 text-sm text-ink-2">{data.user.email}</p>
+            <p className="mb-1 break-all font-mono text-sm text-ink-2">{data.user.address}</p>
+            <p className="mb-3 text-xs text-ink-3">Signed in with a wallet on {data.user.chain === 'arc-testnet' ? 'Arc Testnet' : data.user.chain}</p>
             <Button variant="ghost" onClick={signOut}>Sign out</Button>
           </Card>
         )}

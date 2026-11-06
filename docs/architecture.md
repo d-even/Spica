@@ -119,7 +119,7 @@ Every step reports progress through `emit`, which the route streams to the brows
 | Route | Page |
 | --- | --- |
 | `/` | Landing page |
-| `/login` | Email code sign-in |
+| `/login` | Wallet sign-in: Arc Testnet now, Hedera Testnet coming soon |
 | `/dashboard` | Spend against limits, recent activity, pending approvals |
 | `/agent` | Chat with the agent, with live events and approval prompts |
 | `/controls` | The spending policy editor |

@@ -26,19 +26,17 @@ The `/settings` page shows the mode and which integrations are configured. It li
 | Variable | Effect |
 | --- | --- |
 | `SUPABASE_URL` | Project URL |
-| `SUPABASE_ANON_KEY` | Used for sign-in |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only database access. Never expose it to a browser |
 
-All three must be set for Supabase to be used. When they are, sign-in is required even in demo mode.
+Both must be set for Supabase to be used. Supabase is only the database: sign-in does not use Supabase Auth, and `SUPABASE_ANON_KEY` is no longer needed.
 
-### Sign-in email (optional)
+### Wallet sign-in
 
 | Variable | Effect |
 | --- | --- |
-| `RESEND_API_KEY` | Sends sign-in codes through Resend's API instead of Supabase's built-in email |
-| `EMAIL_FROM` | Sender, on a domain verified in Resend, for example `PayGate <login@yourdomain.com>` |
+| `PAYGATE_SESSION_SECRET` | Signs session and sign-in cookies. At least 32 characters, for example from `openssl rand -hex 32`. Required in live mode. In demo mode without it, a random secret is used and sessions end when the server restarts |
 
-Both must be set. Supabase still creates and checks the codes (`auth.admin.generateLink`, which sends no email), so Supabase's email rate limit no longer applies. PayGate's own limits do: 5 codes per email and 20 per IP address every 10 minutes, counted per server instance. Without these variables, Supabase sends the email, and its built-in sender allows only a few emails an hour.
+People sign in with a browser wallet using Sign-In with Ethereum on Arc Testnet (chain `5042002`). The login page adds Arc Testnet to the wallet if it is missing. Hedera Testnet is shown as coming soon. Changing the secret signs everyone out.
 
 ### Arc
 
@@ -103,8 +101,8 @@ PAYGATE_MODE=live
 PAYGATE_PUBLIC_URL=https://your-deployment.example
 ANTHROPIC_API_KEY=sk-ant-...
 SUPABASE_URL=...
-SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
+PAYGATE_SESSION_SECRET=...     # openssl rand -hex 32
 AGENT_PRIVATE_KEY=0x...        # funded from faucet.circle.com, then deposited into Gateway
 PAYGATE_SELLER_ADDRESS=0x...   # a different wallet
 CRICAPI_KEY=...
@@ -127,4 +125,6 @@ These are constants in code, not settings.
 | Agent runs | 10 / min / user | `api/agent/run` |
 | Signed-in routes | 120 / min / user / route | `http/api.ts` |
 | Seller route | 120 / min / IP | `api/x402/[serviceId]` |
-| Email codes | 5 sends and 10 checks per email, 20 sends per IP, per 10 min | `api/auth/*` |
+| Wallet sign-in | 30 nonces and 20 sign-in attempts per IP, per 10 min | `api/auth/*` |
+| Sign-in message lifetime | 10 min | `server/auth.ts` |
+| Session lifetime | 7 days | `server/auth.ts` |

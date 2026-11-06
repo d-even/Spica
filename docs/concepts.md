@@ -70,7 +70,7 @@ See [Networks and adapters](networks-and-adapters.md).
 | Payment rail | Simulated `demo` network | Arc and/or Hedera |
 | Money | None | Testnet USDC, or mainnet if enabled |
 | Storage | In memory, lost on restart | Supabase (required) |
-| Sign-in | None, one shared demo user (unless Supabase is set) | Email code |
+| Sign-in | Optional wallet sign-in. Otherwise one shared demo user | Wallet sign-in on Arc Testnet, required |
 | Receipts | **Simulated** | **Verified**, **Settling**, **Unverified** or **Failed** |
 
 Demo mode still runs the real 402 handshake, the real firewall, real reservations and real receipts. Only the signature and the settlement are simulated.

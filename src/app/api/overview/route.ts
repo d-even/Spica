@@ -13,7 +13,7 @@ export const GET = authed(async (user) => {
     store.listActivity(user.id, 15),
   ]);
   return toJson({
-    user: { email: user.email, demo: user.demo },
+    user: { address: user.address, chain: user.chain, demo: user.demo },
     mode: mode(),
     mainnetEnabled: mainnetEnabled(),
     store: store.kind,

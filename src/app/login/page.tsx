@@ -1,32 +1,24 @@
 'use client';
 
+import { Wallet } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState, type FormEvent } from 'react';
-import { api } from '@/components/api';
-import { Button, Card, ErrorNote, Field, Input } from '@/components/ui';
+import { useState } from 'react';
+import { Badge, Button, Card, ErrorNote } from '@/components/ui';
+import { signInWithArc, walletErrorMessage } from '@/components/wallet';
 
 export default function Login() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [token, setToken] = useState('');
-  const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
+  async function connectArc() {
     setBusy(true);
     setError(undefined);
     try {
-      if (sent) {
-        await api('/api/auth/verify', { method: 'POST', body: JSON.stringify({ email, token }) });
-        router.push('/dashboard');
-      } else {
-        await api('/api/auth/otp', { method: 'POST', body: JSON.stringify({ email }) });
-        setSent(true);
-      }
+      await signInWithArc();
+      router.push('/dashboard');
     } catch (cause) {
-      setError((cause as Error).message);
+      setError(walletErrorMessage(cause));
     } finally {
       setBusy(false);
     }
@@ -35,18 +27,39 @@ export default function Login() {
   return (
     <main className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-sm" title="Sign in to PayGate">
-        <form onSubmit={submit} className="space-y-4">
-          <Field label="Email">
-            <Input type="email" required autoComplete="email" disabled={sent} value={email} onChange={(event) => setEmail(event.target.value)} />
-          </Field>
-          {sent && (
-            <Field label="Code" hint="We emailed you a one-time code.">
-              <Input required inputMode="numeric" autoComplete="one-time-code" value={token} onChange={(event) => setToken(event.target.value)} />
-            </Field>
-          )}
-          {error && <ErrorNote>{error}</ErrorNote>}
-          <Button type="submit" className="w-full" disabled={busy}>{sent ? 'Sign in' : 'Email me a code'}</Button>
-        </form>
+        <p className="mb-4 text-sm text-ink-2">
+          Connect your wallet and sign a message to prove it is yours. Signing is free and sends no transaction.
+        </p>
+
+        <div className="space-y-3">
+          <div className="rounded-xl border border-line p-3">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-medium">Arc Testnet</p>
+              <Badge tone="good">Available</Badge>
+            </div>
+            <Button className="w-full" onClick={connectArc} disabled={busy}>
+              <Wallet size={16} aria-hidden />
+              {busy ? 'Check your wallet…' : 'Connect wallet'}
+            </Button>
+          </div>
+
+          <div className="rounded-xl border border-line p-3">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-medium">Hedera Testnet</p>
+              <Badge>Coming soon</Badge>
+            </div>
+            <Button variant="ghost" className="w-full" disabled>
+              <Wallet size={16} aria-hidden />
+              Connect wallet
+            </Button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="mt-4">
+            <ErrorNote>{error}</ErrorNote>
+          </div>
+        )}
       </Card>
     </main>
   );

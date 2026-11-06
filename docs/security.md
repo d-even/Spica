@@ -38,16 +38,18 @@ PayGate moves money on behalf of an AI agent, so it assumes the model can be man
 | `SUPABASE_SERVICE_ROLE_KEY` | Database access | `store/supabase.ts` |
 | `HEDERA_OPERATOR_KEY` | HCS publishing | `audit/hcs.ts` |
 | `ADMIN_PRIVATE_KEY` | Creating PayGate IDs on Sepolia | `lib/subdomain.ts` |
-| `RESEND_API_KEY` | Sending sign-in codes | `server/email.ts` |
+| `PAYGATE_SESSION_SECRET` | Signing session and sign-in cookies | `server/session.ts` |
 
 Use a new, dedicated wallet for the agent, holding only what you are willing to lose. Keep `ADMIN_PRIVATE_KEY` separate from it.
 
 ## Sessions
 
-- Sign-in is an emailed code through Supabase Auth. The access token is stored in an httpOnly, `SameSite=Lax` cookie named `paygate_session`.
-- With Resend configured, Supabase creates the code with the service-role key and PayGate emails it, so Supabase's email limits no longer protect the sign-in form. PayGate limits code requests to 5 per email and 20 per IP every 10 minutes, per server instance. If you run several instances, add a shared limiter or bot protection in front of `/api/auth/otp`.
-- The code is never logged or returned to the browser.
-- Without Supabase, demo mode uses one shared demo user. Live mode refuses to run without Supabase.
+- Sign-in uses [Sign-In with Ethereum](https://eips.ethereum.org/EIPS/eip-4361) on Arc Testnet. `POST /api/auth/nonce` issues a random nonce in a signed cookie that lasts 10 minutes. `POST /api/auth/wallet` accepts the signed message only if it is for this site's host and chain `5042002`, carries that nonce, was issued in the last 10 minutes, and is signed by its address. EOAs are checked by signature recovery, and smart wallets through the Arc RPC (ERC-1271 and ERC-6492).
+- Each nonce is deleted when used, so a signed message cannot be replayed.
+- The session is a cookie named `paygate_session` holding the user ID, address and chain, HMAC-signed with `PAYGATE_SESSION_SECRET`, with a 7-day expiry. It is httpOnly, `SameSite=Lax`, and `Secure` in production. Every token names its purpose, so a nonce cookie cannot be used as a session.
+- Sessions are stateless, so signing out clears the cookie but cannot revoke a copied token before it expires. Rotate `PAYGATE_SESSION_SECRET` to end every session.
+- The wallet that signs in only proves identity. Payments always come from the server's agent wallet, behind the firewall.
+- Without a session, demo mode uses one shared demo user. Live mode requires signing in, and refuses to run without Supabase.
 - Approvals can only be decided by their owner, while pending, before they expire.
 
 ## Known limits

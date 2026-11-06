@@ -14,8 +14,7 @@ export const publicUrl = () => (process.env.PAYGATE_PUBLIC_URL ?? 'http://localh
 export const supabaseConfig = () => {
   const url = process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-  return url && serviceRoleKey && anonKey ? { url, serviceRoleKey, anonKey } : null;
+  return url && serviceRoleKey ? { url, serviceRoleKey } : null;
 };
 
 export interface Integration {
@@ -43,8 +42,8 @@ export function integrations(): Integration[] {
       missing: [],
     },
     check('llm', 'Claude', 'Understands requests and plans the agent run.', ['ANTHROPIC_API_KEY']),
-    check('supabase', 'Supabase', 'Durable data and sign-in.', ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY']),
-    check('email', 'Resend', 'Sends sign-in codes. Without it, Supabase sends them.', ['RESEND_API_KEY', 'EMAIL_FROM'], true),
+    check('supabase', 'Supabase', 'Durable data.', ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']),
+    check('session', 'Wallet sign-in', 'Signs session cookies for wallet sign-in. Required in live mode.', ['PAYGATE_SESSION_SECRET']),
     check('arc', 'Arc payments', 'USDC nanopayments through Circle Gateway.', ['AGENT_PRIVATE_KEY']),
     check('seller', 'Arc seller', 'Receives payments for the built-in cricket services.', ['PAYGATE_SELLER_ADDRESS'], true),
     check(

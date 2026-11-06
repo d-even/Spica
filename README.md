@@ -86,9 +86,7 @@ Receipt statuses are **Verified** (settled and confirmed), **Settling** (accepte
 
 1. Copy `.env.example` to `.env.local`.
 2. Create a Supabase project. Review `supabase/migrations/20261105000000_spending_firewall.sql` against any existing tables, then apply it.
-3. Choose how sign-in codes are emailed:
-   - **Resend (recommended):** set `RESEND_API_KEY` and `EMAIL_FROM` (an address on a domain verified in Resend). PayGate sends the code itself, and Supabase's email rate limit does not apply.
-   - **Supabase's built-in email:** edit the magic link email template in Supabase Auth to include `{{ .Token }}`, since sign-in uses a typed code. It allows only a few emails an hour.
+3. Set `PAYGATE_SESSION_SECRET` to a random string of at least 32 characters, for example from `openssl rand -hex 32`. It signs the wallet sign-in cookies.
 4. Add `ANTHROPIC_API_KEY`.
 5. Create a new EOA wallet for the agent and set `AGENT_PRIVATE_KEY`. Set `PAYGATE_SELLER_ADDRESS` to a different wallet.
 6. Get Arc testnet USDC from https://faucet.circle.com, then move it into Gateway:
@@ -132,7 +130,7 @@ All routes except `/api/x402/*` and `/api/auth/*` need a signed-in session. Iden
 | `POST /api/provider/services` | Register an API |
 | `DELETE /api/provider/services/:id` | Remove your API |
 | `GET /api/x402/:serviceId` | A paid resource, using x402 v2 |
-| `POST /api/auth/otp`, `/verify`, `/logout` | Sign-in |
+| `POST /api/auth/nonce`, `/wallet`, `/logout` | Wallet sign-in (Sign-In with Ethereum on Arc Testnet) |
 
 ## Integrating PayGate
 
@@ -151,7 +149,7 @@ You can also [reuse the policy engine](#reusing-the-firewall-in-your-own-agent) 
 
 PayGate hosts the paywall and proxies paid requests to your API.
 
-1. Sign in and open `/provider`.
+1. Sign in with your wallet and open `/provider`.
 2. Fill in your provider profile:
    - **Wallet address**: the EVM address that receives USDC on Arc.
    - **ENS name** (optional): it must resolve to that wallet. Buyers check it before every payment and refuse to pay on a mismatch.
@@ -213,15 +211,38 @@ Any x402 v2 buyer can pay you, including PayGate's agent, if your API is in the 
 
 ### 3. Buy through PayGate from your app or agent
 
-Run PayGate (demo or live) and drive it over HTTP. Your app sends a plain-language request, and PayGate discovers, pays within your policy and returns the answer. Your app never holds a wallet key.
+Run PayGate (demo or live) and drive it over HTTP. Your app sends a plain-language request, and PayGate discovers, pays within your policy and returns the answer. Your app never holds the agent's payment key.
 
-**Sign in.** In demo mode without Supabase, no sign-in is needed and everyone shares one demo user. With Supabase, use the email code flow. It sets an httpOnly `paygate_session` cookie, which you send with later calls:
+**Sign in.** In demo mode, signing in is optional: without it, everyone shares one demo user. In live mode, sign in with a wallet using [Sign-In with Ethereum](https://eips.ethereum.org/EIPS/eip-4361) on Arc Testnet. The wallet only proves who you are. Payments come from the server's agent wallet. Sign-in sets an httpOnly `paygate_session` cookie, valid for 7 days, which you send with later calls:
 
-```bash
-curl -X POST "$PAYGATE/api/auth/otp"    -H 'content-type: application/json' -d '{"email":"you@example.com"}'
-curl -X POST "$PAYGATE/api/auth/verify" -H 'content-type: application/json' -c cookies.txt \
-  -d '{"email":"you@example.com","token":"123456"}'
+```ts
+import { privateKeyToAccount } from 'viem/accounts';
+import { createSiweMessage } from 'viem/siwe';
+
+const account = privateKeyToAccount(process.env.MY_WALLET_KEY as `0x${string}`);
+
+// 1. Get a nonce. It comes with a signed cookie that must be sent back.
+const nonceRes = await fetch(`${PAYGATE}/api/auth/nonce`, { method: 'POST' });
+const nonceCookie = nonceRes.headers.getSetCookie()[0].split(';')[0];
+const { nonce } = await nonceRes.json();
+
+// 2. Sign a message for this site and Arc Testnet (chain 5042002).
+const message = createSiweMessage({
+  address: account.address, chainId: 5042002, domain: new URL(PAYGATE).host, uri: PAYGATE,
+  version: '1', nonce, issuedAt: new Date(),
+});
+const signature = await account.signMessage({ message });
+
+// 3. Exchange it for a session cookie.
+const res = await fetch(`${PAYGATE}/api/auth/wallet`, {
+  method: 'POST',
+  headers: { 'content-type': 'application/json', cookie: nonceCookie },
+  body: JSON.stringify({ chain: 'arc-testnet', message, signature }),
+});
+const cookie = res.headers.getSetCookie()[0].split(';')[0]; // send this with later calls
 ```
+
+The `curl` examples below use `-b cookies.txt`. Put that `paygate_session=...` value in it.
 
 **Set your limits.** Amounts are USD strings:
 

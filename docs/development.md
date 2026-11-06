@@ -31,7 +31,7 @@ This Next.js version has breaking changes from older releases. Before writing fr
 
 - **Money is `bigint` micro-USD.** Never use floating point for an amount. Convert at the edges with `src/lib/money.ts`. Record shapes that must be JSON-safe store micros as strings.
 - **Server code starts with `import 'server-only'`.** Code in `src/lib/` must stay safe for the browser.
-- **Routes use `authed()`** from `src/server/http/api.ts`. It takes the user from the session, rate-limits, and turns zod errors into 400 responses. Only `/api/x402/*`, `/api/auth/*` and `/api/subdomain/check` are public.
+- **Routes use `authed()`** from `src/server/http/api.ts`. It takes the user from the session, rate-limits, and turns zod errors into 400 responses. Only `/api/x402/*`, `/api/auth/*` and `/api/subdomain/check` are public. The session comes from `currentUser()` in `src/server/auth.ts`, a signed cookie set by wallet sign-in.
 - **Validate input with zod** at the route.
 - **Third-party URLs** go through `assertPublicUrl` and `safeFetch`.
 - **New records go through `SpendStore`**, implemented in both `MemoryStore` and `SupabaseStore`, with a migration for Supabase.
