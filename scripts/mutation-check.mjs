@@ -14,7 +14,7 @@ const MUTATIONS = [
   ['mainnet guard removed', 'src/server/firewall/policy.ts', 'if (network.mainnet && !options.mainnetEnabled) {', 'if (false) {'],
   ['any asset accepted', 'src/server/firewall/policy.ts', 'if (!network || request.asset.toLowerCase() !== network.tokenAsset.toLowerCase()) {', 'if (!network) {'],
   ['price rise accepted', 'src/server/firewall/policy.ts', 'amount > request.listedAmountMicros', 'false'],
-  ['ENS mismatch ignored', 'src/server/firewall/policy.ts', "if (request.identityStatus === 'mismatch') {", 'if (false) {'],
+  ['Identity mismatch ignored', 'src/server/firewall/policy.ts', "if (request.identityStatus === 'mismatch') {", 'if (false) {'],
   ['reservation skips daily budget', 'src/server/store/memory.ts', "if (state.spentTodayMicros + input.amountMicros > input.dailyLimitMicros) return { ok: false, reason: 'daily_limit' };", ''],
   ['reservation skips task budget', 'src/server/store/memory.ts', 'if (input.taskBudgetMicros !== undefined && state.spentThisTaskMicros + input.amountMicros > input.taskBudgetMicros) {', 'if (false) {'],
   ['duplicates allowed', 'src/server/store/memory.ts', "return { ok: false, reason: 'duplicate' };", ''],

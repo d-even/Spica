@@ -7,14 +7,14 @@ import { Badge, PageHeader } from '@/components/ui';
 
 export default function AgentPage() {
   const { data, reload } = useApi<OverviewDto>('/api/overview');
-  const claude = data?.integrations.find((integration) => integration.id === 'llm')?.configured;
+  const llm = data?.integrations.find((integration) => integration.id === 'llm');
 
   return (
     <>
       <PageHeader title="Agent" description="Tell it what you need. Every payment passes through your Spending Firewall first." />
       {data && (
         <p className="mb-4 flex items-center gap-2 text-sm text-ink-2">
-          Status <Badge tone={claude ? 'good' : 'warn'}>{claude ? 'Ready' : 'Demo planner, no Claude key'}</Badge>
+          Status <Badge tone={llm?.configured ? 'good' : 'warn'}>{llm?.configured ? `Ready · ${llm.label}` : 'Demo planner, no AI key set'}</Badge>
         </p>
       )}
       <div className="space-y-4">

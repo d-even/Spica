@@ -74,7 +74,6 @@ const toProvider = (row: Row): ProviderRecord => ({
   id: row.id,
   ownerUserId: row.owner_user_id,
   name: row.name ?? '',
-  email: row.email,
   ensName: row.ens_name,
   walletAddress: row.wallet_address,
   hederaAccount: row.hedera_account,
@@ -287,6 +286,19 @@ export class SupabaseStore implements SpendStore {
     );
   }
 
+  async updateTransactionStatus(id: string, update: Pick<TransactionRecord, 'status' | 'statusDetail' | 'reference' | 'payer'>) {
+    return toTransaction(
+      must(
+        await this.db
+          .from('transactions')
+          .update({ status: update.status, status_detail: update.statusDetail, reference: update.reference, payer: update.payer })
+          .eq('id', id)
+          .select()
+          .single(),
+      ),
+    );
+  }
+
   async getTransaction(userId: string, id: string) {
     const row = maybe(await this.db.from('transactions').select('*').eq('id', id).eq('user_id', userId).maybeSingle());
     return row ? toTransaction(row) : null;
@@ -368,7 +380,8 @@ export class SupabaseStore implements SpendStore {
             {
               owner_user_id: record.ownerUserId,
               name: record.name,
-              email: record.email,
+              // Legacy NOT NULL column. Wallet accounts have no email.
+              email: '',
               ens_name: record.ensName,
               wallet_address: record.walletAddress,
               hedera_account: record.hederaAccount,

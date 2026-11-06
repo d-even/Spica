@@ -4,6 +4,7 @@ import { arcTestnet } from 'viem/chains';
 import { parseSiweMessage, verifySiweMessage } from 'viem/siwe';
 import { z } from 'zod';
 import { NONCE_TTL_SECONDS, startSession, takeNonce, walletUserId } from '@/server/auth';
+import { publicUrl } from '@/server/env';
 import { apiError } from '@/server/http/api';
 import { allowRequest } from '@/server/http/rate-limit';
 
@@ -38,10 +39,14 @@ export async function POST(request: Request) {
   }
   if (!nonce) return apiError('This sign-in request expired. Try again.', 400);
 
-  const host = (request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? '').split(',')[0].trim();
+  // The configured public URL, not the Host or X-Forwarded-Host headers, which a client can set.
+  const host = new URL(publicUrl()).host;
   const fields = parseSiweMessage(message);
   const issuedAt = fields.issuedAt?.getTime();
   if (!fields.address || fields.chainId !== arcTestnet.id || fields.domain !== host) {
+    if (fields.domain && fields.domain !== host) {
+      console.error(`Wallet sign-in for ${fields.domain}, but PAYGATE_PUBLIC_URL is for ${host}.`);
+    }
     return apiError('This sign-in message is not for this site or for Arc Testnet.', 400);
   }
   if (!issuedAt || issuedAt > Date.now() + CLOCK_SKEW_MS || Date.now() - issuedAt > NONCE_TTL_SECONDS * 1000) {

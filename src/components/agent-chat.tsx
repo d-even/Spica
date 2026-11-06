@@ -48,8 +48,6 @@ function Step({ event }: { event: AgentEvent }) {
       return row(<ChevronRight size={15} aria-hidden />, `Trying ${event.service.name} from ${event.service.provider}`);
     case 'quote':
       return row(done, `Provider quoted ${event.amount} on ${NETWORKS[event.network as NetworkId]?.label ?? event.network}`);
-    case 'identity':
-      return event.identity.status === 'none' ? null : row(done, `Identity: ${event.identity.detail}`);
     case 'policy':
       if (event.decision === 'allow') return row(<ShieldCheck size={15} className="text-good" aria-hidden />, `Spending Firewall approved: ${event.reason}`);
       if (event.decision === 'deny') return row(<ShieldAlert size={15} className="text-bad" aria-hidden />, `Spending Firewall blocked: ${event.reason}`);
@@ -192,7 +190,7 @@ export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean
               <Card
                 title="Answer"
                 className="rise"
-                action={answer.source === 'demo' ? <Badge tone="warn">Demo planner</Badge> : <Badge tone="info">Claude</Badge>}
+                action={answer.source === 'demo' ? <Badge tone="warn">Demo planner</Badge> : <Badge tone="info">{answer.source === 'gemini' ? 'Gemini' : 'Claude'}</Badge>}
               >
                 <p className="whitespace-pre-wrap text-sm leading-relaxed">{answer.text}</p>
                 {data && (

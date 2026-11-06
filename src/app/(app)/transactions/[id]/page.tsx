@@ -19,7 +19,6 @@ export default function Receipt({ params }: { params: Promise<{ id: string }> })
     ['Transaction ID', <span key="id" className="font-mono text-xs">{tx.id}</span>],
     ['Agent', <span key="agent" className="font-mono text-xs">{tx.agentId}</span>],
     ['Provider', tx.providerName],
-    ['Provider ENS', tx.providerEns ?? 'None'],
     ['API', tx.serviceName],
     ['Amount', `${formatUsd(tx.amountMicros)} ${tx.token}`],
     ['Network', network.label],

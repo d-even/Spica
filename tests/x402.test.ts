@@ -12,7 +12,7 @@ import {
 import { toMirrorTransactionId } from '@/server/payments/hedera';
 import { computeReputation, MIN_OBSERVATIONS } from '@/server/reputation';
 import { isPrivateAddress } from '@/server/http/guard';
-import { parsePaymentRequired, selectRequirement } from '@/server/purchase';
+import { parsePaymentRequired, payableNetworks, selectRequirement } from '@/server/purchase';
 import { formatUsd, microsToUsd, usdToMicros } from '@/lib/money';
 import type { Observation } from '@/server/store/types';
 
@@ -180,6 +180,13 @@ describe('buyer quote handling', () => {
   it('chooses the cheapest offer on an enabled network', () => {
     expect(selectRequirement(terms as never, ['arc-testnet', 'hedera-testnet'])?.network).toBe('hedera-testnet');
     expect(selectRequirement(terms as never, ['arc-testnet'])?.requirement.amount).toBe('30000');
+  });
+
+  it('honours the networks a person allows when choosing an offer', () => {
+    const networks = payableNetworks(['arc-testnet', 'hedera-testnet'], ['arc-testnet']);
+    expect(networks).toEqual(['arc-testnet']);
+    expect(selectRequirement(terms as never, networks)?.network).toBe('arc-testnet');
+    expect(payableNetworks(['demo'], [])).toEqual(['demo']);
   });
 
   it('ignores a cheap offer on a network that is not enabled', () => {

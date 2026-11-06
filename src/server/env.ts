@@ -9,6 +9,19 @@ export const mode = (): Mode => (process.env.PAYGATE_MODE === 'live' ? 'live' : 
 /** Mainnet moves real money, so it takes an explicit server-side opt-in. */
 export const mainnetEnabled = () => process.env.PAYGATE_ENABLE_MAINNET === 'true';
 
+/**
+ * Which model plans agent runs. AGENT_PROVIDER picks one explicitly; otherwise
+ * whichever key is set is used (Gemini first, then Claude), else the demo planner.
+ */
+export function agentProvider(): 'gemini' | 'claude' | 'demo' {
+  const wanted = process.env.AGENT_PROVIDER?.toLowerCase();
+  if (wanted === 'gemini' && process.env.GEMINI_API_KEY) return 'gemini';
+  if (wanted === 'claude' && process.env.ANTHROPIC_API_KEY) return 'claude';
+  if (process.env.GEMINI_API_KEY) return 'gemini';
+  if (process.env.ANTHROPIC_API_KEY) return 'claude';
+  return 'demo';
+}
+
 export const publicUrl = () => (process.env.PAYGATE_PUBLIC_URL ?? 'http://localhost:3000').replace(/\/$/, '');
 
 export const supabaseConfig = () => {
@@ -41,7 +54,13 @@ export function integrations(): Integration[] {
       configured: true,
       missing: [],
     },
-    check('llm', 'Claude', 'Understands requests and plans the agent run.', ['ANTHROPIC_API_KEY']),
+    {
+      id: 'llm',
+      label: agentProvider() === 'claude' ? 'Claude' : 'Gemini',
+      purpose: 'Understands requests and plans the agent run. Set GEMINI_API_KEY or ANTHROPIC_API_KEY.',
+      configured: agentProvider() !== 'demo',
+      missing: agentProvider() === 'demo' ? ['GEMINI_API_KEY'] : [],
+    },
     check('supabase', 'Supabase', 'Durable data.', ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']),
     check('session', 'Wallet sign-in', 'Signs session cookies for wallet sign-in. Required in live mode.', ['PAYGATE_SESSION_SECRET']),
     check('arc', 'Arc payments', 'USDC nanopayments through Circle Gateway.', ['AGENT_PRIVATE_KEY']),

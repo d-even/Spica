@@ -25,7 +25,7 @@ For how it works inside, see the [documentation](docs/README.md).
 - **Spending Firewall:** per-request, daily, monthly and per-task limits, provider allowlist and blocklist, network permissions, an approval threshold, and an automatic-payment switch.
 - **Discovery:** the live Circle Agent Marketplace, plus services registered on PayGate.
 - **Payments:** Arc USDC through Circle Gateway nanopayments, and Hedera USDC through an x402 facilitator, behind one adapter interface.
-- **Provider identity:** ENS names are checked against the payment address. A mismatch blocks payment.
+- **Provider wallets:** providers connect a browser wallet (or paste an address) to receive Arc payments, and add a Hedera account ID for Hedera payments. No name service is required.
 - **Reputation:** measured from real calls only. Below five calls it says "Not enough data".
 - **Receipts and audit:** every payment gets a receipt, with optional Hedera Consensus Service publishing.
 - **Provider dashboard:** register an API, set a price, and see revenue, failures and reputation.
@@ -41,7 +41,6 @@ flowchart TD
     A -->|purchase by service ID only| P[Purchase orchestrator]
     P -->|unpaid request| S[Seller]
     S -->|402 and terms| P
-    P --> E[ENS identity check]
     P --> F[Policy engine]
     F -->|needs approval| H[Person approves]
     F -->|allowed| R[Atomic reservation]
@@ -324,7 +323,7 @@ On its own it cannot stop two concurrent requests from both passing. Pair it wit
 | --- | --- |
 | `npm test` | Policy engine, reservations, approvals, middleware, reputation, URL guard |
 | `npm run test:e2e -- <url>` | The full journey against a running server in demo mode |
-| `npm run test:live` | Real Arc, Gateway, ENS and Hedera, with throwaway unfunded keys. It cannot spend |
+| `npm run test:live` | Real Arc, Gateway and Hedera, with throwaway unfunded keys. It cannot spend |
 | `npm run test:mutation` | Breaks 20 protections one at a time and confirms the tests notice |
 
 ## Security
@@ -344,7 +343,6 @@ On its own it cannot stop two concurrent requests from both passing. Pair it wit
 - The signer is a module boundary, not a separate process. For production, move it to its own service or a KMS.
 - Rate limiting is per server instance. Budgets do not depend on it.
 - Unverified payments stay counted, and there is no reconciliation screen yet.
-- ENS shows identity only. It says nothing about the quality of an API.
 - Reputation is computed from calls made through this PayGate deployment.
 - Provider revenue counts sales reported by PayGate's seller route.
 - The seller route does not yet forward a buyer's query parameters to a registered provider's endpoint.

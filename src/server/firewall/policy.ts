@@ -45,7 +45,11 @@ export interface PaymentRequest {
   listedAmountMicros?: bigint;
   /** Budget the person stated for this task, if any. */
   taskBudgetMicros?: bigint;
-  /** Result of comparing a claimed ENS name with the payment address. */
+  /**
+   * Result of checking a provider's claimed identity against the payment
+   * address. No identity source is wired in today (ENS was retired); kept for a
+   * future one such as Hedera HCS-14.
+   */
   identityStatus?: 'match' | 'mismatch' | 'none';
 }
 
@@ -108,7 +112,7 @@ export function evaluatePolicy(
     return deny('provider_not_allowlisted', 'This provider is not on your allowlist.');
   }
   if (request.identityStatus === 'mismatch') {
-    return deny('identity_mismatch', "The provider's ENS name does not resolve to the payment address.");
+    return deny('identity_mismatch', "The provider's verified identity does not match the payment address.");
   }
   if (request.listedAmountMicros !== undefined && amount > request.listedAmountMicros) {
     return deny(

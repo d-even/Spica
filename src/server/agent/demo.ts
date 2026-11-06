@@ -16,7 +16,7 @@ export const extractSearchTerm = (message: string) =>
     .join(' ');
 
 /**
- * A fixed plan used when no Claude key is set. It runs the same discovery,
+ * A fixed plan used when no Gemini key is set. It runs the same discovery,
  * firewall and payment path as the real agent, but does no reasoning, and the
  * interface labels its answers as coming from the demo planner.
  */
@@ -39,7 +39,7 @@ export async function runDemoAgent(session: AgentSession, message: string) {
       const cost = result.transaction ? `${formatUsd(result.transaction.amountMicros)} (simulated)` : 'nothing';
       session.emit({
         type: 'answer',
-        text: `Here is the data from ${candidate.name}. This cost ${cost}. Add a Claude key in Settings for a written summary.`,
+        text: `Here is the data from ${candidate.name}. This cost ${cost}. Add a Gemini key in Settings for a written summary.`,
         source: 'demo',
       });
       return;

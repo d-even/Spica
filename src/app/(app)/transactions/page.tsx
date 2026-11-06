@@ -36,7 +36,7 @@ export default function Transactions() {
                     <Link href={`/transactions/${tx.id}`} className="font-medium">{tx.serviceName}</Link>
                     <time className="block text-xs text-ink-3">{new Date(tx.createdAt).toLocaleString()}</time>
                   </td>
-                  <td className="px-4 py-3 text-ink-2">{tx.providerEns ?? tx.providerName}</td>
+                  <td className="px-4 py-3 text-ink-2">{tx.providerName}</td>
                   <td className="px-4 py-3 tabular-nums">{formatUsd(tx.amountMicros)}</td>
                   <td className="px-4 py-3 text-ink-2">{NETWORKS[tx.network].label}</td>
                   <td className="px-4 py-3 font-mono text-xs text-ink-3">{shorten(tx.reference)}</td>

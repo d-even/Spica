@@ -169,6 +169,12 @@ export class MemoryStore implements SpendStore {
     return transaction;
   }
 
+  async updateTransactionStatus(id: string, update: Pick<TransactionRecord, 'status' | 'statusDetail' | 'reference' | 'payer'>) {
+    const transaction = this.transactions.find((tx) => tx.id === id);
+    if (!transaction) throw new Error('Transaction not found.');
+    return Object.assign(transaction, update);
+  }
+
   async getTransaction(userId: string, id: string) {
     return this.transactions.find((tx) => tx.id === id && tx.userId === userId) ?? null;
   }
