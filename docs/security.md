@@ -59,8 +59,7 @@ Use a new, dedicated wallet for the agent, holding only what you are willing to 
 - Unverified payments stay counted, and there is no reconciliation screen yet.
 - ENS shows identity only. It says nothing about API quality.
 - Reputation reflects calls made through this deployment only.
-- The seller route calls registered provider endpoints without credentials, so anyone who knows a provider's URL can call it directly.
-- The seller route does not yet forward a buyer's query parameters to a registered provider's endpoint.
+- A registered provider endpoint without a stored API key can be called directly by anyone who knows its URL. Providers can store a key, encrypted with `PAYGATE_ENCRYPTION_KEY`, which PayGate sends only on paid calls.
 
 ## Reviewing a change
 

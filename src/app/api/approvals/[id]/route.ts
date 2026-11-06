@@ -26,7 +26,7 @@ export const POST = authed(async (user, request, { params }: { params: Promise<{
   });
   if (decision === 'rejected') return toJson({ outcome: 'rejected' });
 
-  const { service, params: serviceParams, taskBudgetMicros } = approval.request;
+  const { service, params: serviceParams, taskBudgetMicros, preferredNetwork } = approval.request;
   const events: PurchaseEvent[] = [];
   const result = await purchase(
     {
@@ -35,6 +35,7 @@ export const POST = authed(async (user, request, { params }: { params: Promise<{
       agentId: await store.ensureAgent(user.id),
       taskId: approval.taskId,
       taskBudgetMicros: taskBudgetMicros === undefined ? undefined : BigInt(taskBudgetMicros),
+      preferredNetwork,
       emit: (event) => events.push(event),
     },
     { service, params: serviceParams, approval },

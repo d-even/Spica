@@ -1,17 +1,21 @@
 import 'server-only';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { decodePaymentRequiredHeader, decodePaymentResponseHeader, encodePaymentSignatureHeader } from '@x402/core/http';
-import type { PaymentRequired, PaymentRequirements, SettleResponse } from 'paygate-x402';
+import { NOT_SETTLED_HEADER, type PaymentRequired, type PaymentRequirements, type SettleResponse } from 'paygate-x402';
 import { formatUsd } from '@/lib/money';
-import { networkByCaip2, type NetworkId } from '@/lib/networks';
-import { publishAuditEvent, hcsConfigured } from '@/server/audit/hcs';
+import { decodeUsageCode, defaultUsageCode, developerApiCode, USAGE_CODE_HEADER } from '@/lib/usage-code';
+import { issueApiKey } from '@/server/api-keys';
+import { NETWORKS, networkByCaip2, type NetworkId } from '@/lib/networks';
+import { settlementProof } from '@/lib/proof';
+import { auditPayment } from '@/server/audit/record';
 import type { CatalogService } from '@/server/discovery/types';
-import { activeNetworks, mainnetEnabled } from '@/server/env';
+import { activeNetworks, mainnetEnabled, publicUrl } from '@/server/env';
 import { evaluatePolicy, type PolicyDecision } from '@/server/firewall/policy';
 import { assertPublicUrl, safeFetch } from '@/server/http/guard';
 import { getAdapter } from '@/server/payments/registry';
 import type { Confirmation } from '@/server/payments/types';
 import { requirementHash, signPayment } from '@/server/signer';
+import { watchSettlement } from '@/server/settlement';
 import { APPROVAL_TTL_MS } from '@/server/store/windows';
 import type { ApprovalRecord, SpendStore, TransactionRecord } from '@/server/store/types';
 
@@ -21,6 +25,8 @@ export interface PurchaseContext {
   agentId: string;
   taskId: string;
   taskBudgetMicros?: bigint;
+  /** The network a person named. Other offers are not used. */
+  preferredNetwork?: NetworkId;
   emit: (event: PurchaseEvent) => void;
 }
 
@@ -37,6 +43,8 @@ export interface ReceiptSummary {
   status: string;
   reference: string | null;
   detail: string | null;
+  /** Released by the paid response. Null when the payment failed. */
+  usageCode: string | null;
 }
 
 export type PurchaseResult =
@@ -51,6 +59,8 @@ export interface PurchaseRequest {
   params?: Record<string, string>;
   /** An approval a person already granted for this exact quote. */
   approval?: ApprovalRecord;
+  /** A metered call through an API key: identical calls are expected, and no new key is issued. */
+  repeatable?: boolean;
 }
 
 export function parsePaymentRequired(headers: Headers, body: string): PaymentRequired | null {
@@ -83,7 +93,7 @@ export function selectRequirement(paymentRequired: PaymentRequired, networks: Ne
 
 export async function purchase(context: PurchaseContext, request: PurchaseRequest): Promise<PurchaseResult> {
   const { store, userId, taskId, emit } = context;
-  const { service, params, approval } = request;
+  const { service, params, approval, repeatable } = request;
   const started = Date.now();
 
   const observe = (outcome: { reachable: boolean; succeeded: boolean; paid: boolean; quoted?: bigint }) =>
@@ -133,7 +143,10 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
   // Choose among networks the person allows, so a cheaper offer on a network they
   // turned off does not hide one they would accept.
   const policy = await store.getPolicy(userId);
-  const selected = selectRequirement(paymentRequired, payableNetworks(activeNetworks(), policy.allowedNetworks));
+  const networks = payableNetworks(activeNetworks(), policy.allowedNetworks).filter(
+    (candidate) => !context.preferredNetwork || candidate === context.preferredNetwork,
+  );
+  const selected = selectRequirement(paymentRequired, networks);
   if (!selected) {
     await observe({ reachable: true, succeeded: false, paid: false });
     const reason = selectRequirement(paymentRequired, activeNetworks())
@@ -145,6 +158,7 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
   const amountMicros = BigInt(requirement.amount);
   const hash = requirementHash(requirement, resource);
   emit({ type: 'quote', service: service.name, amount: formatUsd(amountMicros), network });
+  console.log(`[x402] 402 Payment Required: ${service.name}, ${formatUsd(amountMicros)} USDC on ${NETWORKS[network].label}`);
 
   // 2. Firewall. The model has no say in it.
   const humanApproved = approval !== undefined && approval.status === 'approved' && approval.requirementHash === hash;
@@ -162,6 +176,7 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
     humanApproved,
   });
   emit({ type: 'policy', decision: decision.outcome, reason: decision.reason });
+  console.log(`[x402] Spending Firewall: ${decision.outcome}. ${decision.reason}`);
   await store.appendActivity({
     userId,
     transactionId: null,
@@ -184,7 +199,7 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
       network,
       requirementHash: hash,
       reason: decision.reason,
-      request: { service, params, taskBudgetMicros: context.taskBudgetMicros?.toString() },
+      request: { service, params, taskBudgetMicros: context.taskBudgetMicros?.toString(), preferredNetwork: context.preferredNetwork },
       expiresAt: new Date(Date.now() + APPROVAL_TTL_MS).toISOString(),
     });
     return { outcome: 'needs_approval', approval: created };
@@ -198,7 +213,7 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
     dailyLimitMicros: policy.dailyLimitMicros,
     monthlyLimitMicros: policy.monthlyLimitMicros,
     taskBudgetMicros: context.taskBudgetMicros,
-    dedupeHash: createHash('sha256').update(`${userId}|${hash}`).digest('hex'),
+    dedupeHash: createHash('sha256').update(`${userId}|${hash}${repeatable ? `|${randomUUID()}` : ''}`).digest('hex'),
     requirementHash: hash,
   });
   if (!reservation.ok) {
@@ -226,7 +241,6 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
       taskId,
       providerKey: service.providerKey,
       providerName: service.providerName,
-      providerEns: null,
       serviceId: service.id,
       serviceName: service.name,
       resource,
@@ -259,8 +273,10 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
   if (paid.status === 402) {
     await store.releaseReservation(reservationId, { paymentNotSent: true });
     await observe({ reachable: true, succeeded: false, paid: true, quoted: amountMicros });
-    const transaction = await record({ status: 'failed', reference: null, payer: null, detail: 'The seller rejected the payment.' });
-    return { outcome: 'failed', reason: 'The seller rejected the payment. No money moved.', transaction };
+    const rejection = parsePaymentRequired(paid.headers, paid.text)?.error;
+    const detail = rejection ? `The seller rejected the payment: ${rejection}.` : 'The seller rejected the payment.';
+    const transaction = await record({ status: 'failed', reference: null, payer: null, detail });
+    return { outcome: 'failed', reason: `${detail} No money moved.`, transaction };
   }
 
   const paymentResponse = paid.headers.get('PAYMENT-RESPONSE');
@@ -269,6 +285,12 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
     if (paid.status >= 200 && paid.status < 300) {
       const transaction = await record({ status: 'unverified', reference: null, payer: null, detail: 'The seller returned data with no settlement proof.' });
       return { outcome: 'delivered', data: paid.text, transaction, free: false };
+    }
+    // PayGate's own seller says so only when settlement never ran. Third parties are not taken at their word.
+    if (service.source !== 'circle' && paid.headers.get(NOT_SETTLED_HEADER)) {
+      await store.releaseReservation(reservationId, { paymentNotSent: true });
+      const transaction = await record({ status: 'failed', reference: null, payer: null, detail: `The service returned HTTP ${paid.status}, so nothing was charged.` });
+      return { outcome: 'failed', reason: 'The service is having trouble right now, so nothing was charged. Try again shortly.', transaction };
     }
     const transaction = await record({ status: 'unverified', reference: null, payer: null, detail: `The seller returned HTTP ${paid.status} after the proof was sent.` });
     return { outcome: 'failed', reason: `The service returned HTTP ${paid.status} after payment was sent. The amount stays held for review.`, transaction };
@@ -293,6 +315,30 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
   const transaction = await record(confirmation);
   await observe({ reachable: true, succeeded: confirmation.status !== 'failed', paid: true, quoted: amountMicros });
 
+  // Only PayGate's own seller route is trusted to set this header.
+  const provided = service.source === 'paygate' ? decodeUsageCode(paid.headers.get(USAGE_CODE_HEADER)) : null;
+  const apiKey =
+    confirmation.status === 'failed' || repeatable || provided || service.source === 'circle'
+      ? null
+      : issueApiKey({
+          userId,
+          agentId: context.agentId,
+          serviceId: service.id,
+          taskId,
+          budgetMicros: context.taskBudgetMicros?.toString(),
+          network: context.preferredNetwork,
+        });
+  const query = new URLSearchParams(params).toString();
+  const developerUrl = `${publicUrl()}/api/v1/${service.id}${query ? `?${query}` : ''}`;
+  const developerCode = apiKey ? developerApiCode(developerUrl, apiKey) : defaultUsageCode(resource);
+  const usageCode = confirmation.status === 'failed' || repeatable ? null : (provided ?? developerCode);
+  if (usageCode) {
+    // The payment is already recorded, so a failure here must not undo the result.
+    await store
+      .appendActivity({ userId, transactionId: transaction.id, eventType: 'usage_code', eventData: { code: usageCode } })
+      .catch((error) => console.error('Could not save usage code:', error));
+  }
+
   await store.appendActivity({
     userId,
     transactionId: transaction.id,
@@ -308,27 +354,15 @@ export async function purchase(context: PurchaseContext, request: PurchaseReques
       status: transaction.status,
       reference: transaction.reference,
       detail: transaction.statusDetail,
+      usageCode,
     },
   });
 
-  if (hcsConfigured() && (transaction.status === 'verified' || transaction.status === 'settling')) {
-    publishAuditEvent({
-      agentId: context.agentId,
-      providerKey: service.providerKey,
-      amountMicros: amountMicros.toString(),
-      token: 'USDC',
-      network,
-      reference: transaction.reference,
-      status: transaction.status,
-      timestamp: transaction.createdAt,
-    })
-      .then((result) =>
-        store.appendActivity({ userId, transactionId: transaction.id, eventType: 'hcs_published', eventData: { ...result } }),
-      )
-      .catch((error) =>
-        store.appendActivity({ userId, transactionId: transaction.id, eventType: 'hcs_failed', eventData: { message: String(error) } }),
-      );
-  }
+  console.log(`[x402] ${service.name}: ${transaction.status}. ${transaction.statusDetail}`);
+  const settled = settlementProof(transaction);
+  if (settled) console.log(`[proof] ${settled.label}: ${settled.url}`);
+  auditPayment(store, transaction);
+  if (transaction.status === 'settling') watchSettlement(store, transaction);
 
   return { outcome: 'delivered', data: paid.text, transaction, free: false };
 }

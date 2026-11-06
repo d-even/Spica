@@ -4,7 +4,7 @@ import { useCallback, useState, type FormEvent } from 'react';
 import { api, useApi, type ReputationDto } from '@/components/api';
 import { BarChart, lastSevenDays } from '@/components/bar-chart';
 import { ConnectWallet } from '@/components/connect-wallet';
-import { Button, Card, Empty, ErrorNote, Field, Input, Loading, PageHeader, Stat, Textarea } from '@/components/ui';
+import { Button, Card, Empty, ErrorNote, Field, Input, Loading, PageHeader, Select, Stat, Textarea } from '@/components/ui';
 import { formatUsd } from '@/lib/money';
 import { NETWORKS, SELECTABLE_NETWORKS, type NetworkId } from '@/lib/networks';
 
@@ -22,6 +22,7 @@ interface ServiceDto {
   endpoint: string;
   priceMicros: string;
   supportedNetworks: NetworkId[];
+  apiKeyHash: string | null;
   reputation: ReputationDto;
 }
 
@@ -95,7 +96,7 @@ function ProfileForm({ provider, onSaved }: { provider: ProviderDto | null; onSa
 }
 
 function ServiceForm({ onCreated }: { onCreated: () => void }) {
-  const empty = { name: '', description: '', endpoint: '', price: '0.01', supportedNetworks: ['arc-testnet'] as NetworkId[] };
+  const empty = { name: '', description: '', endpoint: '', price: '0.01', usageCode: '', apiKey: '', apiKeyPlacement: 'bearer', apiKeyName: '', supportedNetworks: ['arc-testnet'] as NetworkId[] };
   const [form, setForm] = useState(empty);
   const [error, setError] = useState<string>();
 
@@ -121,8 +122,28 @@ function ServiceForm({ onCreated }: { onCreated: () => void }) {
             <Input required type="url" placeholder="https://api.example.com/data" value={form.endpoint} onChange={(e) => setForm({ ...form, endpoint: e.target.value })} />
           </Field>
         </div>
+        <Field label="Your API key" hint="Optional. Encrypted, never shown again, and used only to call your API after payment.">
+          <Input type="password" autoComplete="off" value={form.apiKey} onChange={(e) => setForm({ ...form, apiKey: e.target.value })} />
+        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Send the key as">
+            <Select value={form.apiKeyPlacement} onChange={(e) => setForm({ ...form, apiKeyPlacement: e.target.value })}>
+              <option value="bearer">Bearer token</option>
+              <option value="header">Header</option>
+              <option value="query">Query parameter</option>
+            </Select>
+          </Field>
+          {form.apiKeyPlacement !== 'bearer' && (
+            <Field label="Name"><Input placeholder={form.apiKeyPlacement === 'header' ? 'x-api-key' : 'apikey'} value={form.apiKeyName} onChange={(e) => setForm({ ...form, apiKeyName: e.target.value })} /></Field>
+          )}
+        </div>
         <div className="sm:col-span-2">
           <Field label="Description"><Textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
+        </div>
+        <div className="sm:col-span-2">
+          <Field label="Code buyers get after paying" hint="Up to 3 lines, shown only after payment. Leave it empty and PayGate generates a snippet.">
+            <Textarea rows={3} spellCheck={false} className="font-mono" placeholder={'const res = await fetch("https://api.example.com/data");\nconst data = await res.json();\nconsole.log(data);'} value={form.usageCode} onChange={(e) => setForm({ ...form, usageCode: e.target.value })} />
+          </Field>
         </div>
         <fieldset className="sm:col-span-2">
           <legend className="mb-1.5 text-sm font-medium">Payment networks</legend>
@@ -217,6 +238,7 @@ export default function Provider() {
                       </span>
                     </div>
                     <p className="break-all font-mono text-xs text-ink-3">/api/x402/{service.id}</p>
+                    {service.apiKeyHash && <p className="font-mono text-xs text-ink-3">API key stored, fingerprint {service.apiKeyHash.slice(0, 12)}…</p>}
                     <ReputationBreakdown reputation={service.reputation} />
                   </li>
                 ))}

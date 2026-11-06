@@ -7,6 +7,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { DEFAULT_POLICY, type SpendingPolicy, type SpendState } from '@/server/firewall/policy';
+import type { ServiceCredential } from '@/server/secrets';
 import { DEDUPE_WINDOW_MS, HOLD_TTL_MS, monthStart, dayStart } from './windows';
 import type {
   ActivityEvent,
@@ -34,6 +35,7 @@ export class MemoryStore implements SpendStore {
   private reservations = new Map<string, Reservation>();
   private approvals = new Map<string, ApprovalRecord>();
   private transactions: TransactionRecord[] = [];
+  private credentials = new Map<string, ServiceCredential>();
   private activity: ActivityEvent[] = [];
   private providers = new Map<string, ProviderRecord>();
   private services = new Map<string, ServiceRecord>();
@@ -214,10 +216,15 @@ export class MemoryStore implements SpendStore {
     return provider;
   }
 
-  async createService(record: Omit<ServiceRecord, 'id' | 'createdAt'>) {
+  async createService(record: Omit<ServiceRecord, 'id' | 'createdAt'>, credential?: ServiceCredential) {
     const service: ServiceRecord = { ...record, id: randomUUID(), createdAt: new Date().toISOString() };
     this.services.set(service.id, service);
+    if (credential) this.credentials.set(service.id, credential);
     return service;
+  }
+
+  async getServiceCredential(id: string) {
+    return this.credentials.get(id) ?? null;
   }
 
   async getService(id: string) {

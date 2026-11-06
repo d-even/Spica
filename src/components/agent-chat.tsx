@@ -6,15 +6,22 @@ import { useRef, useState, type FormEvent } from 'react';
 import type { AgentEvent, ServiceSummary } from '@/server/agent/session';
 import { NETWORKS, type NetworkId } from '@/lib/networks';
 import { api } from './api';
-import { Badge, Button, Card, ErrorNote, StatusBadge, Textarea } from './ui';
-
-const EXAMPLE = "Find today's cricket scores and give me the latest match updates. My total budget is $0.05.";
+import { CodeBlock } from './code-block';
+import { LivePayment } from './payment-proof';
+import { Badge, Button, Card, ErrorNote, Textarea } from './ui';
 
 interface Run {
   prompt: string;
   events: AgentEvent[];
   running: boolean;
 }
+
+const EXAMPLES = [
+  'I want a weather API for Pune.',
+  'I want a news API about technology.',
+  'I want a stock quotes API for IBM.',
+  'I want a live cricket scores API.',
+];
 
 type Find<T extends AgentEvent['type']> = Extract<AgentEvent, { type: T }>;
 
@@ -81,9 +88,8 @@ export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean
   const [error, setError] = useState<string>();
   const form = useRef<HTMLFormElement>(null);
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    const message = input.trim();
+  async function send(text: string) {
+    const message = text.trim();
     if (!message || run?.running) return;
     setError(undefined);
     setRun({ prompt: message, events: [], running: true });
@@ -118,6 +124,11 @@ export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean
     onFinished?.();
   }
 
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    send(input);
+  }
+
   const events = run?.events ?? [];
   const answer = last(events, 'answer');
   const data = last(events, 'data');
@@ -133,7 +144,7 @@ export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean
           <Textarea
             rows={3}
             aria-label="Ask the agent"
-            placeholder="Ask for something. Mention a budget if you like."
+            placeholder="What kind of API do you want?"
             value={input}
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={(event) => {
@@ -144,9 +155,19 @@ export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean
             }}
           />
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <button type="button" onClick={() => setInput(EXAMPLE)} className="text-left text-xs text-ink-3 underline underline-offset-2">
-              Try the cricket example
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {EXAMPLES.map((example) => (
+                <button
+                  key={example}
+                  type="button"
+                  disabled={run?.running}
+                  onClick={() => send(example)}
+                  className="min-h-9 rounded-full border border-line px-3 text-left text-xs text-ink-2 hover:bg-surface-2 disabled:opacity-50"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
             <Button type="submit" disabled={run?.running || !input.trim()}>
               {run?.running && <Loader2 size={15} className="animate-spin" aria-hidden />}
               {run?.running ? 'Working' : 'Send'}
@@ -186,6 +207,13 @@ export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean
               </Card>
             )}
 
+            {receipt?.transaction.usageCode && (
+              <Card title="Your API" className="rise">
+                <p className="mb-2 text-sm text-ink-2">Paste this into your code. Each call pays {receipt.transaction.amount} from the agent wallet, and counts toward your budget and Spending Firewall limits. Keep the key private.</p>
+                <CodeBlock code={receipt.transaction.usageCode} />
+              </Card>
+            )}
+
             {answer && (
               <Card
                 title="Answer"
@@ -219,11 +247,7 @@ export function AgentChat({ detailed = false, onFinished }: { detailed?: boolean
               )}
               {receipt && (
                 <Card title="Payment" className="rise">
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg font-semibold tabular-nums">{receipt.transaction.amount}</span>
-                    <StatusBadge status={receipt.transaction.status} />
-                  </div>
-                  <p className="mt-1 text-xs text-ink-3">{receipt.transaction.detail}</p>
+                  <LivePayment id={receipt.transaction.id} amount={receipt.transaction.amount} status={receipt.transaction.status} detail={receipt.transaction.detail} />
                   <Link href={`/transactions/${receipt.transaction.id}`} className="mt-2 inline-block text-sm font-medium text-accent">
                     View receipt
                   </Link>

@@ -32,12 +32,14 @@ const MUTATIONS = [
 let survived = 0;
 for (const [name, file, from, to] of MUTATIONS) {
   const original = fs.readFileSync(file, 'utf8');
-  if (!original.includes(from)) {
+  // Git may check files out with CRLF on Windows, which multi-line patterns must follow.
+  const pattern = original.includes('\r\n') ? from.replaceAll('\n', '\r\n') : from;
+  if (!original.includes(pattern)) {
     console.log(`STALE     ${name}: pattern not found`);
     survived += 1;
     continue;
   }
-  fs.writeFileSync(file, original.replace(from, to));
+  fs.writeFileSync(file, original.replace(pattern, to));
   try {
     const run = spawnSync('npx', ['vitest', 'run'], { encoding: 'utf8', shell: true });
     const caught = run.status !== 0;

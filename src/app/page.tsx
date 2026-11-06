@@ -1,46 +1,37 @@
-import { ArrowRight, Fingerprint, Search, ShieldCheck } from 'lucide-react';
-import Link from 'next/link';
+import type { Metadata } from 'next';
+import { Instrument_Serif } from 'next/font/google';
+import { ArcSection } from '@/components/nora/ArcSection';
+import { DeveloperSection } from '@/components/nora/DeveloperSection';
+import { FinalCTA, Footer } from '@/components/nora/FinalCTA';
+import { FirewallSection } from '@/components/nora/FirewallSection';
+import { HederaSection, RolesStrip } from '@/components/nora/HederaSection';
+import { HeroSection } from '@/components/nora/HeroSection';
+import { HowItWorks } from '@/components/nora/HowItWorks';
+import { Navbar } from '@/components/nora/Navbar';
+import '@/components/nora/nora.css';
 
-const POINTS = [
-  { Icon: Search, title: 'Finds the right service', text: 'Your agent searches a live catalog of paid APIs and compares what each one costs.' },
-  { Icon: ShieldCheck, title: 'Stays inside your budget', text: 'Limits are enforced on the server, outside the AI. It cannot talk its way past them.' },
-  { Icon: Fingerprint, title: 'Shows who got paid', text: 'Every payment is checked independently and leaves a receipt you can read.' },
-];
+const serif = Instrument_Serif({ weight: '400', style: ['normal', 'italic'], subsets: ['latin'], variable: '--font-nora-serif' });
+
+export const metadata: Metadata = {
+  title: 'NORA | The Financial Infrastructure for AI Agents',
+  description: 'NORA connects AI agents, developers and services through intelligent spending controls, Arc payments and Hedera trust.',
+};
 
 export default function Home() {
   return (
-    <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-6">
-      <header className="flex items-center justify-between py-6">
-        <span className="text-lg font-semibold tracking-tight">PayGate</span>
-        <Link href="/dashboard" className="text-sm font-medium text-ink-2 hover:text-ink">
-          Open app
-        </Link>
-      </header>
-
-      <main className="flex flex-1 flex-col justify-center py-16">
-        <h1 className="max-w-2xl text-4xl font-semibold leading-tight tracking-tight md:text-5xl">
-          Let AI agents buy what they need, inside the budget you set.
-        </h1>
-        <p className="mt-4 max-w-xl text-lg text-ink-2">
-          Ask for something in plain language. PayGate finds a paid service, checks your spending rules, pays, and hands you the result with a receipt.
-        </p>
-        <Link
-          href="/agent"
-          className="mt-8 inline-flex min-h-11 w-fit items-center gap-2 rounded-xl bg-accent px-5 text-sm font-medium text-accent-ink hover:opacity-90"
-        >
-          Try the agent <ArrowRight size={16} aria-hidden />
-        </Link>
-
-        <div className="mt-16 grid gap-6 md:grid-cols-3">
-          {POINTS.map(({ Icon, title, text }) => (
-            <div key={title}>
-              <Icon size={20} className="text-accent" aria-hidden />
-              <h2 className="mt-3 text-sm font-semibold">{title}</h2>
-              <p className="mt-1 text-sm text-ink-2">{text}</p>
-            </div>
-          ))}
-        </div>
+    <div className={`nora ${serif.variable}`}>
+      <Navbar />
+      <main>
+        <HeroSection />
+        <HowItWorks />
+        <ArcSection />
+        <HederaSection />
+        <RolesStrip />
+        <FirewallSection />
+        <DeveloperSection />
+        <FinalCTA />
       </main>
+      <Footer />
     </div>
   );
 }

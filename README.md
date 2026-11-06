@@ -19,6 +19,39 @@ With no configuration, PayGate runs in **demo mode**: no keys, no money, data in
 
 For how it works inside, see the [documentation](docs/README.md).
 
+## Project status
+
+Last checked on 2026-11-06. PayGate runs in live mode on testnet. A real Arc payment has settled onchain. A real Hedera payment has not happened yet.
+
+| Area | Status |
+| --- | --- |
+| App, agent, firewall and approvals | Working in live mode with Supabase |
+| Unit tests | 132 of 132 passing, and `tsc` is clean |
+| Arc payments | Working. Gemini bought a service through Circle Gateway, and the payment settled onchain |
+| Hedera payments | Accounts are set up and signing works. Blocked on testnet USDC: the agent account holds 0 |
+| HCS audit | Publishing. Only verified or settling payments are published so far, and the topic has no submit key |
+| Circle discovery | Live |
+
+Not built yet:
+
+- Weekly and per-merchant limits, and pause or revoke controls for an agent
+- Multiple agents and agent identity
+- The other five agent tools, and provider comparison
+- Audit events for rejections, mirror-node verification and an audit dashboard
+- Provider and agent SDKs
+- The remaining API routes
+
+## Steps so far
+
+1. Built the spending firewall, the Arc and Hedera adapters, and the `paygate-x402` seller middleware.
+2. Replaced OTP sign-in with wallet sign-in.
+3. Moved the agent to Gemini, with fallback between models.
+4. Added the service role grants migration.
+5. Created a testnet account and an HCS topic with `create-topic.js`.
+6. Inspected the repository and checked the facilitators, the Circle catalog and the Arc and Hedera testnets.
+
+Next is Phase 1, a real Hedera x402 payment, once the setup steps below are done.
+
 ## What it does
 
 - **AI agent:** Claude plans each request through three tools, with a labelled fixed planner when no key is set.
@@ -28,6 +61,7 @@ For how it works inside, see the [documentation](docs/README.md).
 - **Provider wallets:** providers connect a browser wallet (or paste an address) to receive Arc payments, and add a Hedera account ID for Hedera payments. No name service is required.
 - **Reputation:** measured from real calls only. Below five calls it says "Not enough data".
 - **Receipts and audit:** every payment gets a receipt, with optional Hedera Consensus Service publishing.
+- **Built-in APIs:** weather, news, stock quotes and cricket, resold per call. Their upstream keys stay on the server, and a buyer gets a PayGate key.
 - **Provider dashboard:** register an API, set a price, and see revenue, failures and reputation.
 
 ## Architecture
@@ -68,7 +102,7 @@ flowchart TD
 
 1. The agent names a service it discovered in this run. It cannot supply a URL, price or recipient.
 2. PayGate requests the resource unpaid and reads the seller's real `402` terms.
-3. It chooses the cheapest offer on an enabled network and checks provider identity.
+3. It chooses the cheapest offer on a network that is enabled and allowed.
 4. The policy engine decides: allow, needs approval, or deny.
 5. An atomic reservation re-checks budgets and duplicates. This stops concurrent requests overspending.
 6. The signer moves that reservation from held to signing exactly once, for that exact requirement, and signs.
@@ -115,7 +149,7 @@ Base has been removed.
 
 ## API
 
-All routes except `/api/x402/*` and `/api/auth/*` need a signed-in session. Identity always comes from the session, never the request body.
+All routes except `/api/x402/*`, `/api/v1/*` and `/api/auth/*` need a signed-in session. Identity always comes from the session, never the request body.
 
 | Route | Purpose |
 | --- | --- |
@@ -126,9 +160,10 @@ All routes except `/api/x402/*` and `/api/auth/*` need a signed-in session. Iden
 | `GET /api/transactions/:id` | Read a receipt |
 | `GET /api/marketplace` | Search the catalog: `query`, `category`, `network`, `offset` |
 | `GET`, `PUT /api/provider` | Provider profile, sales and reputation |
-| `POST /api/provider/services` | Register an API |
+| `POST /api/provider/services` | Register an API, with optional code released after payment |
 | `DELETE /api/provider/services/:id` | Remove your API |
 | `GET /api/x402/:serviceId` | A paid resource, using x402 v2 |
+| `GET /api/v1/:serviceId` | The developer API. Send the key from a purchase as `Authorization: Bearer <key>`. Each call pays through the firewall, and query parameters reach the provider |
 | `POST /api/auth/nonce`, `/wallet`, `/logout` | Wallet sign-in (Sign-In with Ethereum on Arc Testnet) |
 
 ## Integrating PayGate
@@ -150,10 +185,8 @@ PayGate hosts the paywall and proxies paid requests to your API.
 
 1. Sign in with your wallet and open `/provider`.
 2. Fill in your provider profile:
-   - **Wallet address**: the EVM address that receives USDC on Arc.
-   - **ENS name** (optional): it must resolve to that wallet. Buyers check it before every payment and refuse to pay on a mismatch.
+   - **Wallet address**: the EVM address that receives USDC on Arc. Connect a browser wallet or paste it.
    - **Hedera account** (optional): needed if you accept Hedera, in the form `0.0.1234`.
-   - **PayGate ID** (optional): a free `yourname.paygate.eth` subdomain.
 3. Register a service with a name, description, public endpoint URL, price in USD (for example `0.02`) and the networks you accept.
 
 Your API is then served at `GET /api/x402/<serviceId>` and appears in the marketplace and in agent discovery. For each call PayGate:
@@ -179,8 +212,8 @@ curl -X POST "$PAYGATE/api/provider/services" -b cookies.txt -H 'content-type: a
 Requirements for your endpoint:
 
 - It must be a public `https` URL that answers `GET` with JSON. PayGate refuses private and internal addresses.
-- PayGate calls it without credentials. Anyone who learns the URL can call it for free, so use a URL that is hard to guess, or protect it yourself with [option 2](#2-add-payments-to-your-own-server).
-- Query parameters sent by buyers are not yet forwarded to your endpoint (see [Known limits](#known-limits)).
+- If your API needs a key, add it when you register the service, as a bearer token, a header or a query parameter. PayGate stores it encrypted (`PAYGATE_ENCRYPTION_KEY`) and sends it only on paid calls. Without a key, anyone who learns your URL can call it for free.
+- Query parameters sent by buyers are passed through to your endpoint.
 
 ### 2. Add payments to your own server
 
@@ -335,6 +368,7 @@ On its own it cannot stop two concurrent requests from both passing. Pair it wit
 - Sellers release data only after settlement, because Gateway's `verify` checks signatures, not balances.
 - Third-party text reaches the model marked as untrusted data, and a run can attempt at most three purchases.
 - Catalog URLs are checked against private address ranges, with redirects off, a timeout and a size cap.
+- Provider API keys are stored as an encrypted copy plus a keyed hash. A hash cannot be reversed, so the encrypted copy is what calls the provider. The key is decrypted only on the server, after payment.
 - Row-level security is on with no policies, so the public anon key can read nothing.
 - Spend totals and verification status are always computed on the server.
 
@@ -345,5 +379,4 @@ On its own it cannot stop two concurrent requests from both passing. Pair it wit
 - Unverified payments stay counted, and there is no reconciliation screen yet.
 - Reputation is computed from calls made through this PayGate deployment.
 - Provider revenue counts sales reported by PayGate's seller route.
-- The seller route does not yet forward a buyer's query parameters to a registered provider's endpoint.
 - `paygate-x402` is not published to npm yet. Use it from source.

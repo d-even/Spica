@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import { usdToMicros } from '@/lib/money';
+import { isValidUsageCode, MAX_USAGE_LINES } from '@/lib/usage-code';
 import { SELECTABLE_NETWORKS, type NetworkId } from '@/lib/networks';
 import { apiError, authed, toJson } from '@/server/http/api';
 import { assertPublicUrl } from '@/server/http/guard';
+import { hashSecret, sealSecret, secretsConfigured, type ServiceCredential } from '@/server/secrets';
 import { getStore } from '@/server/store';
 
 const body = z.object({
@@ -14,6 +16,10 @@ const body = z.object({
   supportedNetworks: z
     .array(z.enum(SELECTABLE_NETWORKS as [NetworkId, ...NetworkId[]]))
     .min(1, 'Choose at least one payment network.'),
+  apiKey: z.string().trim().max(1_000).default(''),
+  apiKeyPlacement: z.enum(['bearer', 'header', 'query']).default('bearer'),
+  apiKeyName: z.string().trim().regex(/^[A-Za-z0-9_-]{0,64}$/, 'Use letters, numbers, dashes or underscores.').default(''),
+  usageCode: z.string().trim().refine(isValidUsageCode, `Keep the code to ${MAX_USAGE_LINES} lines.`).default(''),
 });
 
 export const POST = authed(async (user, request) => {
@@ -31,6 +37,12 @@ export const POST = authed(async (user, request) => {
   const needsHedera = input.supportedNetworks.some((network) => network.startsWith('hedera'));
   if (needsHedera && !provider.hederaAccount) return apiError('Add a Hedera account to your profile first.', 400);
 
+  if (input.apiKey && input.apiKeyPlacement !== 'bearer' && !input.apiKeyName) return apiError('Enter the header or parameter name for your API key.', 400);
+  if (input.apiKey && !secretsConfigured()) return apiError('API keys cannot be stored until PAYGATE_ENCRYPTION_KEY is set.', 503);
+  const credential: ServiceCredential | undefined = input.apiKey
+    ? { sealedKey: sealSecret(input.apiKey), placement: input.apiKeyPlacement, name: input.apiKeyPlacement === 'bearer' ? null : input.apiKeyName }
+    : undefined;
+
   const service = await store.createService({
     providerId: provider.id,
     name: input.name,
@@ -40,6 +52,8 @@ export const POST = authed(async (user, request) => {
     priceMicros: input.price,
     supportedNetworks: input.supportedNetworks,
     enabled: true,
-  });
+    usageCode: input.usageCode || null,
+    apiKeyHash: input.apiKey ? hashSecret(input.apiKey) : null,
+  }, credential);
   return toJson(service);
 });

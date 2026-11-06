@@ -1,5 +1,6 @@
 'use client';
 
+import type { PaymentProof } from '@/lib/proof';
 import { useCallback, useEffect, useState } from 'react';
 import type { NetworkId } from '@/lib/networks';
 
@@ -13,6 +14,15 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error ?? 'Something went wrong.');
   return body as T;
+}
+
+/** Keeps a page current while a payment settles, then stops asking. */
+export function useRefreshWhile(active: boolean, reload: () => unknown) {
+  useEffect(() => {
+    if (!active) return;
+    const timer = setInterval(reload, 15_000);
+    return () => clearInterval(timer);
+  }, [active, reload]);
 }
 
 export function useApi<T>(path: string | null) {
@@ -68,7 +78,6 @@ export interface TransactionDto {
   agentId: string;
   providerName: string;
   providerKey: string;
-  providerEns: string | null;
   serviceName: string;
   resource: string;
   amountMicros: string;
@@ -78,6 +87,8 @@ export interface TransactionDto {
   payer: string | null;
   payTo: string;
   status: string;
+  usageCode?: string | null;
+  proof?: PaymentProof;
   statusDetail: string | null;
   createdAt: string;
 }

@@ -20,7 +20,7 @@ export const hcsConfigured = () =>
  * outage must not undo a payment that already happened, so callers record a
  * failure instead of throwing.
  */
-export async function publishAuditEvent(event: HcsAuditEvent): Promise<{ topicId: string; sequence: string } | null> {
+export async function publishAuditEvent(event: HcsAuditEvent): Promise<{ topicId: string; sequence: string; transactionId: string } | null> {
   if (!hcsConfigured()) return null;
   const { Client, PrivateKey, TopicMessageSubmitTransaction } = await import('@hiero-ledger/sdk');
   const topicId = process.env.HEDERA_HCS_TOPIC_ID!;
@@ -33,7 +33,7 @@ export async function publishAuditEvent(event: HcsAuditEvent): Promise<{ topicId
   try {
     const response = await new TopicMessageSubmitTransaction({ topicId, message: JSON.stringify(event) }).execute(client);
     const receipt = await response.getReceipt(client);
-    return { topicId, sequence: receipt.topicSequenceNumber?.toString() ?? '' };
+    return { topicId, sequence: receipt.topicSequenceNumber?.toString() ?? '', transactionId: response.transactionId.toString() };
   } finally {
     client.close();
   }

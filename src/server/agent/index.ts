@@ -1,9 +1,10 @@
 import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { formatUsd } from '@/lib/money';
+import { NETWORKS } from '@/lib/networks';
 import { agentProvider } from '@/server/env';
 import { getStore } from '@/server/store';
-import { parseTaskBudget } from './budget';
+import { parseTaskBudget, parseTaskNetwork } from './budget';
 import { runClaudeAgent } from './claude';
 import { runDemoAgent } from './demo';
 import { GeminiError, geminiModel, runGeminiAgent } from './gemini';
@@ -35,7 +36,10 @@ export async function runAgent(userId: string, message: string, emit: (event: Ag
   const taskBudget = parseTaskBudget(message);
   if (taskBudget !== undefined) emit({ type: 'budget', amount: formatUsd(taskBudget) });
 
-  const session = new AgentSession(store, userId, agentId, taskBudget, emit);
+  const network = parseTaskNetwork(message);
+  if (network) emit({ type: 'status', message: `Paying on ${NETWORKS[network].label} only` });
+
+  const session = new AgentSession(store, userId, agentId, taskBudget, network, emit);
   await store.appendActivity({ userId, transactionId: null, eventType: 'agent_run', eventData: { taskId: session.taskId } });
 
   try {

@@ -22,15 +22,15 @@ export function sessionSecret(): string {
 
 const mac = (body: string) => createHmac('sha256', sessionSecret()).update(body).digest();
 
-export function seal(purpose: string, payload: Record<string, unknown>, ttlSeconds: number): string {
+export function seal(purpose: string, payload: Record<string, unknown>, ttlSeconds: number, now = Date.now()): string {
   const body = Buffer.from(
-    JSON.stringify({ ...payload, purpose, exp: Math.floor(Date.now() / 1000) + ttlSeconds }),
+    JSON.stringify({ ...payload, purpose, exp: Math.floor(now / 1000) + ttlSeconds }),
   ).toString('base64url');
   return `${body}.${mac(body).toString('base64url')}`;
 }
 
 /** The payload if the token is authentic, unexpired and for this purpose. Otherwise null. */
-export function unseal<T extends Record<string, unknown>>(purpose: string, token: string | undefined): T | null {
+export function unseal<T extends Record<string, unknown>>(purpose: string, token: string | undefined, now = Date.now()): T | null {
   if (!token) return null;
   const parts = token.split('.');
   if (parts.length !== 2) return null;
@@ -40,7 +40,7 @@ export function unseal<T extends Record<string, unknown>>(purpose: string, token
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
   try {
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
-    if (payload.purpose !== purpose || typeof payload.exp !== 'number' || payload.exp * 1000 <= Date.now()) return null;
+    if (payload.purpose !== purpose || typeof payload.exp !== 'number' || payload.exp * 1000 <= now) return null;
     return payload as T;
   } catch {
     return null;

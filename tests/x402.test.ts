@@ -13,6 +13,7 @@ import { toMirrorTransactionId } from '@/server/payments/hedera';
 import { computeReputation, MIN_OBSERVATIONS } from '@/server/reputation';
 import { isPrivateAddress } from '@/server/http/guard';
 import { parsePaymentRequired, payableNetworks, selectRequirement } from '@/server/purchase';
+import { decodeUsageCode, defaultUsageCode, developerApiCode, encodeUsageCode, isValidUsageCode } from '@/lib/usage-code';
 import { formatUsd, microsToUsd, usdToMicros } from '@/lib/money';
 import type { Observation } from '@/server/store/types';
 
@@ -264,3 +265,34 @@ describe('money', () => {
     expect(() => usdToMicros('-1')).toThrow();
   });
 });
+
+describe('usage code', () => {
+  it('survives the paid response header, including non-ASCII text', () => {
+    const code = 'const a = 1;\nconsole.log("héllo");\nrun(a);';
+    expect(decodeUsageCode(encodeUsageCode(code))).toBe(code);
+  });
+
+  it('refuses more than three lines and empty headers', () => {
+    expect(isValidUsageCode('1\n2\n3')).toBe(true);
+    expect(isValidUsageCode('1\n2\n3\n4')).toBe(false);
+    expect(decodeUsageCode(Buffer.from('1\n2\n3\n4').toString('base64'))).toBeNull();
+    expect(decodeUsageCode(null)).toBeNull();
+  });
+
+  it('generates three valid lines when a provider set none', () => {
+    const code = defaultUsageCode('https://paygate.test/api/x402/abc');
+    expect(code.split('\n')).toHaveLength(3);
+    expect(isValidUsageCode(code)).toBe(true);
+    expect(code).toContain('https://paygate.test/api/x402/abc');
+  });
+});
+
+describe('developer code', () => {
+  it('is three runnable lines carrying the URL and key', () => {
+    const code = developerApiCode('https://paygate.test/api/v1/abc', 'pg_key');
+    expect(code.split('\n')).toHaveLength(3);
+    expect(code).toContain('https://paygate.test/api/v1/abc');
+    expect(code).toContain('Bearer pg_key');
+  });
+});
+

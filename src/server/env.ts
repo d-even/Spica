@@ -80,6 +80,9 @@ export function integrations(): Integration[] {
       true,
     ),
     check('cricket', 'CricketData', 'Live scores for the built-in cricket services.', ['CRICAPI_KEY'], true),
+    check('weather', 'WeatherAPI', 'Data for the built-in weather service.', ['WEATHERAPI_KEY'], true),
+    check('news', 'GNews', 'Data for the built-in news service.', ['NEWS_API_KEY'], true),
+    check('finance', 'Alpha Vantage', 'Data for the built-in stock quote service.', ['ALPHA_VANTAGE_KEY'], true),
   ];
 }
 

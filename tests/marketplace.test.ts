@@ -11,7 +11,6 @@ const service = (overrides: Partial<CatalogService>): CatalogService => ({
   category: 'Other',
   providerName: 'Acme',
   providerKey: 'paygate:acme',
-  providerEns: null,
   endpoint: 'https://example.com/api/x402/svc',
   method: 'GET',
   offers: [{ network: 'hedera-testnet', amountMicros: '1000', payTo: '0.0.123', asset: '0.0.429274' }],

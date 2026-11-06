@@ -1,4 +1,5 @@
 import 'server-only';
+import type { ServiceCredential } from '@/server/secrets';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { DEFAULT_POLICY, type SpendingPolicy, type SpendState } from '@/server/firewall/policy';
 import type { NetworkId } from '@/lib/networks';
@@ -38,7 +39,6 @@ const toTransaction = (row: Row): TransactionRecord => ({
   taskId: row.task_id,
   providerKey: row.provider_key,
   providerName: row.provider_name,
-  providerEns: row.provider_ens,
   serviceId: row.service_id,
   serviceName: row.service_name,
   resource: row.resource,
@@ -74,7 +74,6 @@ const toProvider = (row: Row): ProviderRecord => ({
   id: row.id,
   ownerUserId: row.owner_user_id,
   name: row.name ?? '',
-  ensName: row.ens_name,
   walletAddress: row.wallet_address,
   hederaAccount: row.hedera_account,
   createdAt: row.created_at,
@@ -90,6 +89,8 @@ const toService = (row: Row): ServiceRecord => ({
   priceMicros: big(row.price_micros),
   supportedNetworks: row.supported_networks ?? [],
   enabled: row.enabled ?? false,
+  usageCode: row.usage_code ?? null,
+  apiKeyHash: row.api_key_hash ?? null,
   createdAt: row.created_at,
 });
 
@@ -265,7 +266,6 @@ export class SupabaseStore implements SpendStore {
             task_id: record.taskId,
             provider_key: record.providerKey,
             provider_name: record.providerName,
-            provider_ens: record.providerEns,
             service_id: record.serviceId,
             service_name: record.serviceName,
             resource: record.resource,
@@ -291,7 +291,13 @@ export class SupabaseStore implements SpendStore {
       must(
         await this.db
           .from('transactions')
-          .update({ status: update.status, status_detail: update.statusDetail, reference: update.reference, payer: update.payer })
+          .update({
+            status: update.status,
+            status_detail: update.statusDetail,
+            tx_hash: update.reference,
+            from_address: update.payer,
+            verified: update.status === 'verified',
+          })
           .eq('id', id)
           .select()
           .single(),
@@ -382,7 +388,6 @@ export class SupabaseStore implements SpendStore {
               name: record.name,
               // Legacy NOT NULL column. Wallet accounts have no email.
               email: '',
-              ens_name: record.ensName,
               wallet_address: record.walletAddress,
               hedera_account: record.hederaAccount,
             },
@@ -394,7 +399,7 @@ export class SupabaseStore implements SpendStore {
     );
   }
 
-  async createService(record: Omit<ServiceRecord, 'id' | 'createdAt'>) {
+  async createService(record: Omit<ServiceRecord, 'id' | 'createdAt'>, credential?: ServiceCredential) {
     const provider = await this.getProvider(record.providerId);
     if (!provider) throw new Error('Provider not found');
     return toService(
@@ -413,6 +418,11 @@ export class SupabaseStore implements SpendStore {
             supported_networks: record.supportedNetworks,
             enabled: record.enabled,
             is_public: true,
+            // Left out when empty, so listing an API works before the column exists.
+            ...(record.usageCode ? { usage_code: record.usageCode } : {}),
+            ...(credential
+              ? { api_key_hash: record.apiKeyHash, api_key_encrypted: credential.sealedKey, api_key_placement: credential.placement, api_key_name: credential.name }
+              : {}),
           })
           .select('*')
           .single(),
@@ -423,6 +433,11 @@ export class SupabaseStore implements SpendStore {
   async getService(id: string) {
     const row = maybe(await this.db.from('apis').select('*').eq('id', id).maybeSingle());
     return row ? toService(row) : null;
+  }
+
+  async getServiceCredential(id: string): Promise<ServiceCredential | null> {
+    const row = maybe(await this.db.from('apis').select('api_key_encrypted, api_key_placement, api_key_name').eq('id', id).maybeSingle());
+    return row?.api_key_encrypted ? { sealedKey: row.api_key_encrypted, placement: row.api_key_placement, name: row.api_key_name } : null;
   }
 
   async listServices(filter?: { providerId?: string; enabledOnly?: boolean }) {

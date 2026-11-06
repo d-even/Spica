@@ -23,6 +23,10 @@ export interface NetworkInfo {
 
 const USDC_ARC = '0x3600000000000000000000000000000000000000';
 
+/** HashScan opens `0.0.1-2-3`. Hedera SDKs print the same ID as `0.0.1@2.3`. */
+export const hashscanTransaction = (id: string, mainnet = false) =>
+  `https://hashscan.io/${mainnet ? 'mainnet' : 'testnet'}/transaction/${id.replace('@', '-').replace(/\.(\d+)$/, '-$1')}`;
+
 export const NETWORKS: Record<NetworkId, NetworkInfo> = {
   'arc-testnet': {
     id: 'arc-testnet',
@@ -55,7 +59,7 @@ export const NETWORKS: Record<NetworkId, NetworkInfo> = {
     tokenSymbol: 'USDC',
     tokenAsset: '0.0.429274',
     tokenDecimals: 6,
-    explorerTx: (id) => `https://hashscan.io/testnet/transaction/${id}`,
+    explorerTx: (id) => hashscanTransaction(id),
   },
   'hedera-mainnet': {
     id: 'hedera-mainnet',
@@ -66,7 +70,7 @@ export const NETWORKS: Record<NetworkId, NetworkInfo> = {
     tokenSymbol: 'USDC',
     tokenAsset: '0.0.456858',
     tokenDecimals: 6,
-    explorerTx: (id) => `https://hashscan.io/mainnet/transaction/${id}`,
+    explorerTx: (id) => hashscanTransaction(id, true),
   },
   demo: {
     id: 'demo',

@@ -65,7 +65,7 @@ describe('runGeminiAgent', () => {
 
     const events: AgentEvent[] = [];
     const store = new MemoryStore();
-    const session = new AgentSession(store, 'user', await store.ensureAgent('user'), undefined, (event) => events.push(event));
+    const session = new AgentSession(store, 'user', await store.ensureAgent('user'), undefined, undefined, (event) => events.push(event));
     await runGeminiAgent(session, 'cricket scores please');
 
     expect(bodies).toHaveLength(2);
@@ -102,7 +102,7 @@ describe('runGeminiAgent', () => {
       }),
     );
     const store = new MemoryStore();
-    const session = new AgentSession(store, 'u', await store.ensureAgent('u'), undefined, () => {});
+    const session = new AgentSession(store, 'u', await store.ensureAgent('u'), undefined, undefined, () => {});
     await runGeminiAgent(session, 'x');
     expect(bodies[1].contents[2].parts[0].functionResponse?.response.error).toMatch(/Invalid arguments/);
   });
