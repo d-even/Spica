@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>API Explorer | SPICA</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1020;
+      --panel: #121a2d;
+      --panel-2: #18233a;
+      --line: #293650;
+      --text: #eef3ff;
+      --muted: #9aa9c2;
+      --accent: #8b9cff;
+      --accent-2: #62d6bd;
+      --danger: #ff8f9b;
+      --shadow: 0 18px 55px rgba(0,0,0,.24);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(ellipse at 15% 0%, #1b2a50 0, transparent 42%), var(--bg);
+      color: var(--text);
+      font: 15px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .shell { width: min(1120px, calc(100% - 36px)); margin: 0 auto; padding: 42px 0 64px; }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin-bottom: 28px; }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      display: grid; place-items: center; width: 42px; height: 42px; border-radius: 13px;
+      background: linear-gradient(135deg, #8b9cff, #62d6bd); color: #10172a; font-weight: 900;
+    }
+    h1 { margin: 0; font-size: clamp(25px, 4vw, 36px); letter-spacing: -.04em; }
+    .subtitle { margin: 5px 0 0; color: var(--muted); }
+    .tag { border: 1px solid var(--line); color: var(--muted); padding: 6px 10px; border-radius: 999px; font-size: 12px; white-space: nowrap; }
+    .layout { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 20px; align-items: start; }
+    .panel { background: rgba(18,26,45,.94); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); }
+    .form-panel { padding: 22px; }
+    .panel h2 { margin: 0 0 5px; font-size: 17px; }
+    .hint { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+    label { display: block; margin: 15px 0 6px; font-size: 13px; font-weight: 650; color: #dce5f7; }
+    input, select, textarea {
+      width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px;
+      background: #0d1527; color: var(--text); font: inherit; outline: none;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139,156,255,.13); }
+    input::placeholder, textarea::placeholder { color: #687894; }
+    textarea { min-height: 82px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .checkline { display: flex; align-items: center; gap: 8px; margin-top: 12px; color: var(--muted); font-size: 12px; }
+    .checkline input { width: auto; accent-color: var(--accent); }
+    button {
+      border: 0; border-radius: 11px; padding: 12px 16px; font: inherit; font-weight: 750; cursor: pointer;
+      transition: transform .15s ease, opacity .15s ease;
+    }
+    button:hover { transform: translateY(-1px); }
+    button:disabled { opacity: .55; cursor: wait; transform: none; }
+    .primary { width: 100%; margin-top: 18px; color: #10172a; background: linear-gradient(110deg, #aab5ff, #6fe0c7); }
+    .secondary { color: var(--text); background: var(--panel-2); border: 1px solid var(--line); padding: 8px 12px; font-size: 12px; }
+    .right { min-width: 0; }
+    .welcome { padding: 28px; min-height: 270px; display: grid; align-content: center; text-align: center; }
+    .welcome .symbol { font-size: 34px; margin-bottom: 8px; }
+    .welcome p { max-width: 460px; margin: 7px auto 0; color: var(--muted); }
+    .results { display: none; }
+    .result-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; padding: 20px 22px; border-bottom: 1px solid var(--line); }
+    .result-head p { color: var(--muted); margin: 4px 0 0; font-size: 12px; overflow-wrap: anywhere; }
+    .status { border-radius: 999px; padding: 5px 9px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+    .ok { background: rgba(98,214,189,.13); color: var(--accent-2); }
+    .bad { background: rgba(255,143,155,.13); color: var(--danger); }
+    .summary { padding: 18px 22px 4px; color: var(--muted); font-size: 13px; }
+    .summary strong { color: var(--text); }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 10px; padding: 16px 22px 22px; }
+    .metric { padding: 14px; border: 1px solid var(--line); background: #0e172a; border-radius: 13px; min-width: 0; }
+    .metric .key { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; overflow-wrap: anywhere; }
+    .metric .value { margin-top: 6px; font-size: 17px; font-weight: 750; overflow-wrap: anywhere; }
+    .table-wrap { padding: 0 22px 22px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 420px; }
+    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; background: #0e172a; }
+    td { max-width: 260px; overflow-wrap: anywhere; }
+    details { border-top: 1px solid var(--line); padding: 15px 22px 20px; }
+    summary { cursor: pointer; color: #cbd6ed; font-size: 13px; font-weight: 700; }
+    pre { overflow: auto; max-height: 440px; padding: 14px; background: #0a1120; border: 1px solid var(--line); border-radius: 10px; color: #c6d5f2; font-size: 12px; }
+    .notice { margin-top: 16px; padding: 12px; border: 1px solid rgba(255,190,100,.25); background: rgba(255,190,100,.07); color: #e8c995; border-radius: 11px; font-size: 12px; }
+    .error-box { margin: 18px 22px 22px; padding: 14px; border: 1px solid rgba(255,143,155,.3); background: rgba(255,143,155,.08); border-radius: 12px; color: #ffc1c8; }
+    .hidden { display: none !important; }
+    @media (max-width: 820px) {
+      .layout { grid-template-columns: 1fr; }
+      header { align-items: flex-start; }
+      .tag { display: none; }
+    }
+    @media (max-width: 480px) {
+      .shell { width: min(100% - 22px, 1120px); padding-top: 24px; }
+      .form-panel { padding: 17px; }
+      .row { grid-template-columns: 1fr; gap: 0; }
+      .result-head { padding: 16px; }
+      .cards { padding: 14px 16px 18px; }
+      .summary { padding: 15px 16px 0; }
+      .table-wrap { padding: 0 16px 18px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand">
+        <div class="brand-mark">S</div>
+        <div>
+          <h1>API Explorer</h1>
+          <p class="subtitle">Fetch, understand and inspect API data.</p>
+        </div>
+      </div>
+      <span class="tag">Standalone demo · HTML / CSS / JS</span>
+    </header>
+
+    <div class="layout">
+      <section class="panel form-panel" aria-labelledby="config-title">
+        <h2 id="config-title">Connect an API</h2>
+        <p class="hint">Enter an endpoint and configure how it receives your API key.</p>
+
+        <form id="api-form">
+          <label for="api-url">API endpoint URL</label>
+          <input id="api-url" type="url" placeholder="https://api.example.com/v1/data" required>
+
+          <div class="row">
+            <div>
+              <label for="method">HTTP method</label>
+              <select id="method">
+                <option value="GET">GET</option>
+                <option value="POST">POST</option>
+              </select>
+            </div>
+            <div>
+              <label for="auth-mode">API key location</label>
+              <select id="auth-mode">
+                <option value="bearer">Bearer token</option>
+                <option value="header">Custom header</option>
+                <option value="query">Query parameter</option>
+                <option value="none">No API key</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="key-fields">
+            <label for="api-key">API key</label>
+            <input id="api-key" type="password" placeholder="Paste your API key" autocomplete="off">
+            <div id="header-name-wrap" class="hidden">
+              <label for="header-name">Header name</label>
+              <input id="header-name" type="text" value="X-API-Key" placeholder="X-API-Key">
+            </div>
+            <div id="query-name-wrap" class="hidden">
+              <label for="query-name">Query parameter name</label>
+              <input id="query-name" type="text" value="apikey" placeholder="apiKey">
+            </div>
+          </div>
+
+          <label for="extra-headers">Additional headers (optional JSON)</label>
+          <textarea id="extra-headers" placeholder='{"Accept":"application/json"}'></textarea>
+
+          <div id="body-wrap" class="hidden">
+            <label for="request-body">POST body (JSON)</label>
+            <textarea id="request-body" placeholder='{"query":"example"}'></textarea>
+          </div>
+
+          <label for="data-path">Data path (optional)</label>
+          <input id="data-path" type="text" placeholder="e.g. data.results or forecast.0">
+          <p class="hint" style="margin:6px 0 0">Use this if the useful data is nested inside the response.</p>
+
+          <label class="checkline">
+            <input id="show-sensitive" type="checkbox">
+            Show API key while typing
+          </label>
+
+          <button class="primary" id="fetch-button" type="submit">Fetch and understand data</button>
+        </form>
+
+        <div class="notice">
+          <strong>Security note:</strong> This browser-only demo sends your key directly to the API. Do not use private production keys on a public/shared computer. Keys are not saved by this page.
+        </div>
+      </section>
+
+      <section class="right">
+        <div class="panel welcome" id="welcome">
+          <div class="symbol">↗</div>
+          <h2>Your API results will appear here</h2>
+          <p>Connect a weather, sports, news, finance or any JSON REST API. The explorer will summarize the response and display its fields in a readable format.</p>
+        </div>
+
+        <section class="panel results" id="results" aria-live="polite">
+          <div class="result-head">
+            <div>
+              <h2 id="result-title">API response</h2>
+              <p id="result-meta"></p>
+            </div>
+            <span id="status-badge" class="status ok">200 OK</span>
+          </div>
+          <div id="result-content"></div>
+          <details>
+            <summary>View raw JSON response</summary>
+            <pre id="raw-json"></pre>
+          </details>
+        </section>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const form = $('api-form');
+    const authMode = $('auth-mode');
+    const method = $('method');
+
+    authMode.addEventListener('change', () => {
+      $('key-fields').classList.toggle('hidden', authMode.value === 'none');
+      $('header-name-wrap').classList.toggle('hidden', authMode.value !== 'header');
+      $('query-name-wrap').classList.toggle('hidden', authMode.value !== 'query');
+    });
+
+    method.addEventListener('change', () => {
+      $('body-wrap').classList.toggle('hidden', method.value !== 'POST');
+    });
+
+    $('show-sensitive').addEventListener('change', (event) => {
+      $('api-key').type = event.target.checked ? 'text' : 'password';
+    });
+
+    function humanize(value) {
+      return String(value)
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    }
+
+    function formatValue(value) {
+      if (value === null) return 'Not provided';
+      if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+      if (typeof value === 'object') return Array.isArray(value) ? `${value.length} items` : 'Nested object';
+      if (typeof value === 'number') return new Intl.NumberFormat().format(value);
+      const text = String(value);
+      return text.length > 180 ? `${text.slice(0, 177)}...` : text;
+    }
+
+    function resolvePath(data, path) {
+      if (!path.trim()) return data;
+      return path.split('.').reduce((current, part) => {
+        if (current === null || current === undefined) return undefined;
+        return current[part];
+      }, data);
+    }
+
+    function makeElement(tag, className, text) {
+      const element = document.createElement(tag);
+      if (className) element.className = className;
+      if (text !== undefined) element.textContent = text;
+      return element;
+    }
+
+    function describeData(data) {
+      if (Array.isArray(data)) return `The API returned a list containing ${data.length} item${data.length === 1 ? '' : 's'}.`;
+      if (data && typeof data === 'object') {
+        const keys = Object.keys(data);
+        return `The API returned an object with ${keys.length} top-level field${keys.length === 1 ? '' : 's'}: ${keys.slice(0, 5).map(humanize).join(', ')}${keys.length > 5 ? ', and more' : ''}.`;
+      }
+      return `The API returned a ${data === null ? 'null' : typeof data} value.`;
+    }
+
+    function renderObjectCards(data, container) {
+      const entries = Object.entries(data).filter(([, value]) => value === null || ['string', 'number', 'boolean'].includes(typeof value));
+      if (!entries.length) return false;
+      const cards = makeElement('div', 'cards');
+      entries.slice(0, 24).forEach(([key, value]) => {
+        const card = makeElement('article', 'metric');
+        card.append(makeElement('div', 'key', humanize(key)));
+        card.append(makeElement('div', 'value', formatValue(value)));
+        cards.append(card);
+      });
+      container.append(cards);
+      return true;
+    }
+
+    function renderArrayTable(data, container) {
+      if (!data.length) {
+        container.append(makeElement('p', 'summary', 'The API returned an empty list.'));
+        return;
+      }
+      const objects = data.filter((item) => item && typeof item === 'object' && !Array.isArray(item));
+      if (!objects.length) {
+        const cards = makeElement('div', 'cards');
+        data.slice(0, 24).forEach((item, index) => {
+          const card = makeElement('article', 'metric');
+          card.append(makeElement('div', 'key', `Item ${index + 1}`));
+          card.append(makeElement('div', 'value', formatValue(item)));
+          cards.append(card);
+        });
+        container.append(cards);
+        return;
+      }
+
+      const columns = [...new Set(objects.flatMap((item) => Object.keys(item)))].slice(0, 8);
+      const wrap = makeElement('div', 'table-wrap');
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      columns.forEach((column) => headerRow.append(makeElement('th', '', humanize(column))));
+      thead.append(headerRow);
+      table.append(thead);
+      const tbody = document.createElement('tbody');
+      objects.slice(0, 100).forEach((item) => {
+        const row = document.createElement('tr');
+        columns.forEach((column) => row.append(makeElement('td', '', formatValue(item[column]))));
+        tbody.append(row);
+      });
+      table.append(tbody);
+      wrap.append(table);
+      container.append(wrap);
+      if (objects.length > 100) container.append(makeElement('p', 'summary', `Showing 100 of ${objects.length} records. See raw JSON for the full response.`));
+    }
+
+    function renderData(data, status, url, duration) {
+      $('welcome').classList.add('hidden');
+      const results = $('results');
+      results.style.display = 'block';
+      $('result-title').textContent = 'What the API returned';
+      $('result-meta').textContent = `${url} · ${duration} ms`;
+      $('status-badge').textContent = `${status} ${status >= 200 && status < 300 ? 'OK' : 'Error'}`;
+      $('status-badge').className = `status ${status >= 200 && status < 300 ? 'ok' : 'bad'}`;
+      $('raw-json').textContent = JSON.stringify(data, null, 2);
+
+      const content = $('result-content');
+      content.replaceChildren();
+      content.append(makeElement('p', 'summary', describeData(data)));
+
+      if (Array.isArray(data)) {
+        renderArrayTable(data, content);
+      } else if (data && typeof data === 'object') {
+        const rendered = renderObjectCards(data, content);
+        const nested = Object.entries(data).filter(([, value]) => Array.isArray(value) && value.length);
+        nested.slice(0, 3).forEach(([key, value]) => {
+          content.append(makeElement('p', 'summary', `${humanize(key)} · ${value.length} records`));
+          renderArrayTable(value, content);
+        });
+        if (!rendered && !nested.length) {
+          content.append(makeElement('p', 'summary', 'This response contains nested data. Expand the raw JSON section to inspect its full structure.'));
+        }
+      } else {
+        const cards = makeElement('div', 'cards');
+        const card = makeElement('article', 'metric');
+        card.append(makeElement('div', 'key', 'Result'));
+        card.append(makeElement('div', 'value', formatValue(data)));
+        cards.append(card);
+        content.append(cards);
+      }
+    }
+
+    function showError(message, status = 'Request failed') {
+      $('welcome').classList.add('hidden');
+      $('results').style.display = 'block';
+      $('result-title').textContent = 'Could not fetch API data';
+      $('result-meta').textContent = 'Check the endpoint, authentication and browser CORS permissions.';
+      $('status-badge').textContent = status;
+      $('status-badge').className = 'status bad';
+      $('result-content').replaceChildren(makeElement('div', 'error-box', message));
+      $('raw-json').textContent = '';
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const button = $('fetch-button');
+      const started = performance.now();
+      let url;
+
+      try {
+        url = new URL($('api-url').value.trim());
+        if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Only HTTP and HTTPS endpoints are supported.');
+
+        const headers = { Accept: 'application/json' };
+        const extraHeadersText = $('extra-headers').value.trim();
+        if (extraHeadersText) {
+          const extraHeaders = JSON.parse(extraHeadersText);
+          if (!extraHeaders || Array.isArray(extraHeaders) || typeof extraHeaders !== 'object') {
+            throw new Error('Additional headers must be a JSON object.');
+          }
+          Object.assign(headers, extraHeaders);
+        }
+
+        const key = $('api-key').value.trim();
+        if (authMode.value !== 'none' && key) {
+          if (authMode.value === 'bearer') headers.Authorization = `Bearer ${key}`;
+          if (authMode.value === 'header') {
+            const name = $('header-name').value.trim();
+            if (!name) throw new Error('Enter a custom header name.');
+            headers[name] = key;
+          }
+          if (authMode.value === 'query') {
+            const name = $('query-name').value.trim();
+            if (!name) throw new Error('Enter a query parameter name.');
+            url.searchParams.set(name, key);
+          }
+        } else if (authMode.value !== 'none' && !key) {
+          throw new Error('Enter an API key or choose “No API key”.');
+        }
+
+        const options = { method: method.value, headers };
+        if (method.value === 'POST') {
+          const bodyText = $('request-body').value.trim();
+          if (bodyText) {
+            JSON.parse(bodyText);
+            headers['Content-Type'] = 'application/json';
+            options.body = bodyText;
+          }
+        }
+
+        const path = $('data-path').value.trim();
+        button.disabled = true;
+        button.textContent = 'Fetching data...';
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 20000);
+        let response;
+        let text;
+        try {
+          response = await fetch(url, { ...options, signal: controller.signal });
+          text = await response.text();
+        } finally {
+          clearTimeout(timeout);
+        }
+
+        let data;
+        try { data = text ? JSON.parse(text) : null; }
+        catch { data = { responseText: text.slice(0, 5000), note: 'Response was not valid JSON.' }; }
+
+        if (!response.ok) {
+          const apiMessage = data && typeof data === 'object'
+            ? (data.message || data.error || data.detail)
+            : null;
+          showError(typeof apiMessage === 'string' ? apiMessage : `The API responded with HTTP ${response.status}.`, `${response.status} Error`);
+          $('raw-json').textContent = JSON.stringify(data, null, 2);
+          return;
+        }
+
+        if (path) {
+          const selected = resolvePath(data, path);
+          if (selected === undefined) throw new Error(`Data path "${path}" was not found. Clear the path or check the raw JSON response.`);
+          data = selected;
+        }
+
+        renderData(data, response.status, url.origin + url.pathname, Math.round(performance.now() - started));
+      } catch (error) {
+        const message = error.name === 'AbortError'
+          ? 'The request timed out after 20 seconds.'
+          : error instanceof TypeError
+            ? 'The browser could not reach this API. It may block cross-origin (CORS) requests. Try the provider from a backend proxy instead.'
+            : error.message || 'An unexpected error occurred.';
+        showError(message);
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Fetch and understand data';
+      }
+    });
+  </script>
+</body>
+</html>
