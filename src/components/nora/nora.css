@@ -204,6 +204,10 @@ html:has(.nora) {
   border-radius: 999px;
 }
 
+.n-nav-connected {
+  color: var(--n-ink-2);
+}
+
 .n-menu {
   display: none;
   position: relative;
@@ -884,7 +888,7 @@ html:has(.nora) {
     padding-left: 1rem;
   }
 
-  .n-nav-signin {
+  .n-nav-launch {
     display: none;
   }
 

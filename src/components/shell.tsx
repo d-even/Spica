@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, type ReactNode } from 'react';
 import { SIGN_IN_REQUIRED, useApi, type OverviewDto } from './api';
+import { WalletButton } from './wallet-button';
 
 const NAV = [
   { href: '/dashboard', label: 'Home', Icon: LayoutDashboard },
@@ -68,11 +69,15 @@ export function Shell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="min-w-0 pb-20 md:pb-0">
+        <div className="sticky top-0 z-10 hidden items-center justify-end border-b border-line bg-surface px-8 py-2.5 md:flex">
+          <WalletButton connectClassName="rounded-xl bg-accent px-3 py-2 text-sm font-medium text-accent-ink hover:opacity-90" connectedClassName="rounded-xl border border-line bg-surface-2 py-1 pl-3 pr-1 text-sm text-ink-2" />
+        </div>
         <div className="flex items-center justify-between border-b border-line bg-surface px-4 py-3 md:hidden">
           <Link href="/" className="font-semibold tracking-tight">
             PayGate
           </Link>
           <div className="flex items-center gap-1">
+            <WalletButton connectClassName="rounded-xl bg-accent px-3 py-2 text-sm font-medium text-accent-ink hover:opacity-90" connectedClassName="rounded-xl border border-line bg-surface-2 py-1 pl-3 pr-1 text-sm text-ink-2" />
             <Link href="/settings" aria-label="Settings" className="rounded-xl p-2 text-ink-2">
               <Settings size={18} aria-hidden />
             </Link>

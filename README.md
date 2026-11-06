@@ -194,6 +194,7 @@ All routes except `/api/x402/*`, `/api/v1/*` and `/api/auth/*` need a signed-in 
 | `GET /api/x402/:serviceId` | A paid resource, using x402 v2 |
 | `GET /api/v1/:serviceId` | The developer API. Send the key from a purchase as `Authorization: Bearer <key>`. Each call pays through the firewall, and query parameters reach the provider |
 | `POST /api/auth/challenge`, `/verify`, `/logout` | Wallet sign-in |
+| `GET /api/auth/me` | The signed-in wallet, or null |
 
 ## Using the middleware
 
