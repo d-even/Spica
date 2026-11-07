@@ -1,17 +1,21 @@
 import 'server-only';
 import { z } from 'zod';
+import { generateWithFallback } from './fallback';
 import type { AgentSession } from './session';
 import { agentTools, runTool, SYSTEM_PROMPT, type AgentTool } from './tools';
 
 /**
  * Gemini planner over the Gemini API's REST interface (no SDK needed).
- * `gemini-flash-latest` follows Google's current Flash model; set GEMINI_MODEL
- * to pin a specific one.
+ * Models are tried in order, so one model's outage or spent quota does not end
+ * a run that may already have paid. Set GEMINI_MODEL to use only that one.
  */
-export const geminiModel = () => process.env.GEMINI_MODEL || 'gemini-flash-latest';
+const MODELS = ['gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+export const geminiModels = () => (process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL] : MODELS);
+export const geminiModel = () => geminiModels()[0];
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const MAX_STEPS = 10;
-const TIMEOUT_MS = 60_000;
+/** An overloaded model can hang without answering, so give up and try the next. */
+const TIMEOUT_MS = 30_000;
 
 export class GeminiError extends Error {
   constructor(
@@ -56,8 +60,8 @@ export function toGeminiSchema(schema: z.ZodObject): Record<string, unknown> {
 const declarations = (tools: AgentTool[]) =>
   tools.map((tool) => ({ name: tool.name, description: tool.description, parameters: toGeminiSchema(tool.inputSchema) }));
 
-async function generate(contents: Content[], tools: AgentTool[]): Promise<GenerateResponse> {
-  const response = await fetch(`${API_BASE}/${encodeURIComponent(geminiModel())}:generateContent`, {
+async function generate(model: string, contents: Content[], tools: AgentTool[]): Promise<GenerateResponse> {
+  const response = await fetch(`${API_BASE}/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY ?? '' },
     body: JSON.stringify({
@@ -87,9 +91,12 @@ const asObject = (text: string): Record<string, unknown> => {
 export async function runGeminiAgent(session: AgentSession, message: string) {
   const tools = agentTools(session);
   const contents: Content[] = [{ role: 'user', parts: [{ text: message }] }];
+  let models = geminiModels();
 
   for (let step = 0; step < MAX_STEPS; step += 1) {
-    const result = await generate(contents, tools);
+    const attempt = await generateWithFallback(models, (model) => generate(model, contents, tools));
+    const { result } = attempt;
+    models = attempt.models;
     const candidate = result.candidates?.[0];
     if (!candidate?.content?.parts?.length) {
       const reason = result.promptFeedback?.blockReason ?? candidate?.finishReason ?? 'no reply';

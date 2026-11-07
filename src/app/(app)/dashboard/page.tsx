@@ -91,7 +91,7 @@ export default function Dashboard() {
               <ul className="flex flex-wrap gap-2">
                 {data.networks.map((network) => (
                   <li key={network}>
-                    <Badge tone={NETWORKS[network].mainnet ? 'warn' : 'neutral'}>{NETWORKS[network].label}</Badge>
+                    <Badge>{NETWORKS[network].label}</Badge>
                   </li>
                 ))}
               </ul>

@@ -32,7 +32,6 @@ Rules run in this order and the first one that fails decides. Every rule except 
 | --- | --- | --- |
 | 1 | Amount is above zero | `invalid_amount` |
 | 2 | Asset is the USDC token of that network | `unsupported_asset` |
-| 3 | Mainnet only if the server set `PAYGATE_ENABLE_MAINNET=true` | `mainnet_disabled` |
 | 4 | Network is in `allowedNetworks` (the demo network is exempt) | `network_not_allowed` |
 | 5 | Provider is not blocked | `provider_blocked` |
 | 6 | Provider is on the allowlist, if the allowlist has entries | `provider_not_allowlisted` |
@@ -56,7 +55,7 @@ With the default policy and nothing spent yet:
 
 | Request | Decision | Why |
 | --- | --- | --- |
-| $0.02 from `cricket-live` | allow | Under every limit and the threshold |
+| $0.02 from any service | allow | Under every limit and the threshold |
 | $0.15 with threshold lowered to $0.10 | needs approval | Above the threshold, under the hard limits |
 | $2.00 from any service | deny, `per_request_limit` | Above $0.50. Approval cannot override it |
 | $0.02 when the message said "spend at most 1 cent" | deny, `task_budget` | Above the task budget |

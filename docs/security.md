@@ -25,7 +25,7 @@ PayGate moves money on behalf of an AI agent, so it assumes the model can be man
 | A key leaks into a prompt, log or bundle | Keys read only in `signer/keys.ts`. Server modules import `server-only` | `signer/keys.ts` |
 | A client forges a user ID or spend total | Identity comes from the session cookie. Totals are computed on the server | `http/api.ts`, `auth.ts` |
 | The anon key reads the database | RLS on with no policies, `EXECUTE` revoked on functions | migration |
-| Mainnet turned on by mistake | Needs `PAYGATE_ENABLE_MAINNET=true` on the server. Policy cannot override it | `env.ts`, `firewall/policy.ts` |
+| Mainnet payment attempted | No mainnet network exists in the registry, so the firewall refuses it. |
 | Demo signatures accepted in live mode | The registry refuses the demo adapter in live mode | `payments/registry.ts` |
 | Audit outage undoes a payment | HCS publishing is best effort and runs after the receipt | `audit/hcs.ts` |
 

@@ -22,7 +22,7 @@ const request = (amount: string, extra: Partial<PaymentRequest> = {}): PaymentRe
   ...extra,
 });
 const evaluate = (req: PaymentRequest, spend = noSpend, p = policy, humanApproved = false) =>
-  evaluatePolicy(p, req, spend, { mainnetEnabled: false, humanApproved });
+  evaluatePolicy(p, req, spend, { humanApproved });
 const code = (decision: ReturnType<typeof evaluate>) => (decision.outcome === 'deny' ? decision.code : decision.outcome);
 
 describe('policy decisions', () => {
@@ -74,11 +74,11 @@ describe('policy decisions', () => {
     expect(code(evaluate(request('0.02'), noSpend, { ...policy, allowedNetworks: ['hedera-testnet'] }))).toBe('network_not_allowed');
   });
 
-  it('refuses mainnet unless the server enabled it, whatever the policy says', () => {
-    const allowing = { ...policy, allowedNetworks: ['arc-mainnet' as const] };
-    const req = request('0.02', { network: 'arc-mainnet' });
-    expect(code(evaluatePolicy(allowing, req, noSpend, { mainnetEnabled: false }))).toBe('mainnet_disabled');
-    expect(evaluatePolicy(allowing, req, noSpend, { mainnetEnabled: true }).outcome).toBe('allow');
+  it('refuses mainnet, whatever the policy says', () => {
+    for (const network of ['arc-mainnet', 'hedera-mainnet'] as never[]) {
+      const allowing = { ...policy, allowedNetworks: [network] };
+      expect(code(evaluatePolicy(allowing, request('0.02', { network }), noSpend))).toBe('unsupported_asset');
+    }
   });
 
   it('refuses any asset other than USDC on that network', () => {

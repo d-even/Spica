@@ -67,7 +67,7 @@ export async function signInWithArc(): Promise<string> {
     uri: window.location.origin,
     version: '1',
     nonce,
-    statement: 'Sign in to PayGate. This is free and does not send a transaction.',
+    statement: 'Sign in to SPICA. This is free and does not send a transaction.',
     issuedAt,
     expirationTime: new Date(issuedAt.getTime() + SIGN_IN_TTL_MS),
   });

@@ -27,7 +27,7 @@
         "./src/*"
       ],
       "paygate-x402": [
-        "./paygate-x402/src/index.ts"
+        "./spica/src/index.ts"
       ]
     }
   },
@@ -42,7 +42,8 @@
   "exclude": [
     "node_modules",
     "legacy",
-    "paygate-x402/dist",
+    "spica/dist",
+    "packages",
     "vitest.config.mts",
     "vitest.live.config.mts"
   ]

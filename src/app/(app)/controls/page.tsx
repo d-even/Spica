@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { api, useApi, type OverviewDto, type PolicyDto } from '@/components/api';
+import { api, useApi, type PolicyDto } from '@/components/api';
 import { Button, Card, ErrorNote, Field, Input, Loading, PageHeader, Textarea } from '@/components/ui';
 import { microsToUsd } from '@/lib/money';
 import { NETWORKS, SELECTABLE_NETWORKS, type NetworkId } from '@/lib/networks';
@@ -37,7 +37,6 @@ export default function Controls() {
 }
 
 function PolicyForm({ policy }: { policy: PolicyDto }) {
-  const { data: overview } = useApi<OverviewDto>('/api/overview');
   const [form, setForm] = useState(() => toForm(policy));
   const [error, setError] = useState<string>();
   const [saved, setSaved] = useState(false);
@@ -73,7 +72,7 @@ function PolicyForm({ policy }: { policy: PolicyDto }) {
 
   return (
     <>
-      <PageHeader title="Spending controls" description="These rules are enforced on the server for every payment. The agent cannot see past them or change them." />
+      <PageHeader title="Spending limits" description="These rules are enforced on the server for every payment. The agent cannot see past them or change them." />
       <form onSubmit={save} className="space-y-4">
         <Card title="Budgets in USD">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -96,27 +95,21 @@ function PolicyForm({ policy }: { policy: PolicyDto }) {
 
         <Card title="Network permissions">
           <div className="space-y-2.5">
-            {SELECTABLE_NETWORKS.map((id) => {
-              const network = NETWORKS[id];
-              const locked = network.mainnet && !overview?.mainnetEnabled;
-              return (
-                <label key={id} className={`flex items-center gap-3 text-sm ${locked ? 'text-ink-3' : ''}`}>
-                  <input
-                    type="checkbox"
-                    className="size-4"
-                    disabled={locked}
-                    checked={form.allowedNetworks.includes(id)}
-                    onChange={(event) =>
-                      update({
-                        allowedNetworks: event.target.checked ? [...form.allowedNetworks, id] : form.allowedNetworks.filter((item) => item !== id),
-                      })
-                    }
-                  />
-                  {network.label}
-                  {network.mainnet && <span className="text-xs text-ink-3">{locked ? 'Real money, disabled on this server' : 'Real money'}</span>}
-                </label>
-              );
-            })}
+            {SELECTABLE_NETWORKS.map((id) => (
+              <label key={id} className="flex items-center gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  className="size-4"
+                  checked={form.allowedNetworks.includes(id)}
+                  onChange={(event) =>
+                    update({
+                      allowedNetworks: event.target.checked ? [...form.allowedNetworks, id] : form.allowedNetworks.filter((item) => item !== id),
+                    })
+                  }
+                />
+                {NETWORKS[id].label}
+              </label>
+            ))}
           </div>
         </Card>
 
@@ -127,7 +120,7 @@ function PolicyForm({ policy }: { policy: PolicyDto }) {
             </Field>
           </Card>
           <Card title="Blocked providers">
-            <Field label="One provider per line" hint="Use the provider ID shown in the marketplace.">
+            <Field label="One provider per line" hint="Use the provider ID shown on the Providers page.">
               <Textarea rows={4} value={form.blockedProviders} onChange={(event) => update({ blockedProviders: event.target.value })} />
             </Field>
           </Card>

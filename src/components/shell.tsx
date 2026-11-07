@@ -1,18 +1,18 @@
 'use client';
 
-import { Bot, Gauge, LayoutDashboard, Moon, Receipt, Settings, ShieldCheck, Store, Sun } from 'lucide-react';
+import { Gauge, LayoutDashboard, Moon, Receipt, Settings, ShieldCheck, Store, Sun } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, type ReactNode } from 'react';
 import { SIGN_IN_REQUIRED, useApi, type OverviewDto } from './api';
+import { SPICALogo } from './spica/SPICALogo';
 import { WalletButton } from './wallet-button';
 
 const NAV = [
   { href: '/dashboard', label: 'Home', Icon: LayoutDashboard },
-  { href: '/agent', label: 'Agent', Icon: Bot },
-  { href: '/controls', label: 'Spending', Icon: ShieldCheck },
+  { href: '/controls', label: 'Spending limits', Icon: ShieldCheck },
   { href: '/marketplace', label: 'Marketplace', Icon: Store },
-  { href: '/transactions', label: 'Payments', Icon: Receipt },
+  { href: '/transactions', label: 'Transactions', Icon: Receipt },
   { href: '/provider', label: 'Provider', Icon: Gauge },
 ];
 
@@ -34,16 +34,16 @@ export function Shell({ children }: { children: ReactNode }) {
   const { data, error } = useApi<OverviewDto>('/api/overview');
 
   useEffect(() => {
-    if (error === SIGN_IN_REQUIRED) router.replace('/login');
-  }, [error, router]);
+    if (error === SIGN_IN_REQUIRED) router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+  }, [error, pathname, router]);
 
   const active = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <div className="min-h-screen md:grid md:grid-cols-[220px_1fr]">
-      <aside className="hidden flex-col border-r border-line bg-surface p-4 md:sticky md:top-0 md:flex md:h-screen">
-        <Link href="/" className="mb-6 px-2 text-lg font-semibold tracking-tight">
-          PayGate
+      <aside className="hidden flex-col border-r-2 border-ink bg-surface p-4 md:sticky md:top-0 md:flex md:h-screen">
+        <Link href="/" aria-label="SPICA home" className="mb-6 px-2">
+          <SPICALogo size={36} />
         </Link>
         <nav className="flex flex-1 flex-col gap-1">
           {NAV.map(({ href, label, Icon }) => (
@@ -51,7 +51,7 @@ export function Shell({ children }: { children: ReactNode }) {
               key={href}
               href={href}
               aria-current={active(href) ? 'page' : undefined}
-              className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition ${active(href) ? 'bg-surface-2 font-medium text-ink' : 'text-ink-2 hover:bg-surface-2'}`}
+              className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition ${active(href) ? 'bg-[#ffe34d] font-bold text-[#111]' : 'text-ink-2 hover:bg-surface-2'}`}
             >
               <Icon size={16} aria-hidden /> {label}
             </Link>
@@ -69,15 +69,15 @@ export function Shell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="min-w-0 pb-20 md:pb-0">
-        <div className="sticky top-0 z-10 hidden items-center justify-end border-b border-line bg-surface px-8 py-2.5 md:flex">
-          <WalletButton connectClassName="rounded-xl bg-accent px-3 py-2 text-sm font-medium text-accent-ink hover:opacity-90" connectedClassName="rounded-xl border border-line bg-surface-2 py-1 pl-3 pr-1 text-sm text-ink-2" />
+        <div className="sticky top-0 z-10 hidden items-center justify-end border-b-2 border-ink bg-surface px-8 py-2.5 md:flex">
+          <WalletButton connectClassName="rounded-xl border-2 border-ink bg-[#ffe34d] px-3 py-2 text-sm font-bold text-[#111]" connectedClassName="rounded-xl border-2 border-ink bg-surface-2 py-1 pl-3 pr-1 text-sm text-ink-2" />
         </div>
-        <div className="flex items-center justify-between border-b border-line bg-surface px-4 py-3 md:hidden">
-          <Link href="/" className="font-semibold tracking-tight">
-            PayGate
+        <div className="flex items-center justify-between border-b-2 border-ink bg-surface px-4 py-3 md:hidden">
+          <Link href="/" aria-label="SPICA home">
+            <SPICALogo size={32} />
           </Link>
           <div className="flex items-center gap-1">
-            <WalletButton connectClassName="rounded-xl bg-accent px-3 py-2 text-sm font-medium text-accent-ink hover:opacity-90" connectedClassName="rounded-xl border border-line bg-surface-2 py-1 pl-3 pr-1 text-sm text-ink-2" />
+            <WalletButton connectClassName="rounded-xl border-2 border-ink bg-[#ffe34d] px-3 py-2 text-sm font-bold text-[#111]" connectedClassName="rounded-xl border-2 border-ink bg-surface-2 py-1 pl-3 pr-1 text-sm text-ink-2" />
             <Link href="/settings" aria-label="Settings" className="rounded-xl p-2 text-ink-2">
               <Settings size={18} aria-hidden />
             </Link>

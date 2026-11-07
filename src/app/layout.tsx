@@ -1,13 +1,15 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Anton, Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
+import '@/components/spica/spica.css';
 
-const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
-const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
+const inter = Inter({ variable: '--font-inter', subsets: ['latin'] });
+const jetbrains = JetBrains_Mono({ variable: '--font-jetbrains', subsets: ['latin'] });
+const anton = Anton({ weight: '400', variable: '--font-anton', subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'PayGate',
-  description: 'Let AI agents buy the data they need, inside the budget you set.',
+  title: 'SPICA',
+  description: 'The intelligent payment and trust infrastructure for autonomous AI agents.',
 };
 
 /** Applies a saved theme before first paint, so it never flashes. */
@@ -19,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} min-h-screen`}>{children}</body>
+      <body className={`${inter.variable} ${jetbrains.variable} ${anton.variable} min-h-screen`}>{children}</body>
     </html>
   );
 }

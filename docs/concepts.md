@@ -55,8 +55,6 @@ Networks are named with [CAIP-2](https://github.com/ChainAgnostic/CAIPs/blob/mai
 | --- | --- | --- |
 | `arc-testnet` | `eip155:5042002` | Test USDC |
 | `hedera-testnet` | `hedera:testnet` | Test USDC |
-| `arc-mainnet` | `eip155:5042` | Real USDC, off by default |
-| `hedera-mainnet` | `hedera:mainnet` | Real USDC, off by default |
 | `demo` | `paygate:demo` | Simulated, no money |
 
 See [Networks and adapters](networks-and-adapters.md).
@@ -68,7 +66,7 @@ See [Networks and adapters](networks-and-adapters.md).
 | | Demo (default) | Live |
 | --- | --- | --- |
 | Payment rail | Simulated `demo` network | Arc and/or Hedera |
-| Money | None | Testnet USDC, or mainnet if enabled |
+| Money | None | Testnet USDC only |
 | Storage | In memory, lost on restart | Supabase (required) |
 | Sign-in | Optional wallet sign-in. Otherwise one shared demo user | Wallet sign-in on Arc Testnet, required |
 | Receipts | **Simulated** | **Verified**, **Settling**, **Unverified** or **Failed** |
@@ -91,4 +89,3 @@ Demo mode still runs the real 402 handshake, the real firewall, real reservation
 | **Provider** | Someone selling an API through PayGate |
 | **Provider key** | A stable ID for a provider, used in allowlists and blocklists, for example `paygate:builtin` or `catalog:acme` |
 | **PayGate ID** | A `name.paygate.eth` label from PayGate's registry contract on Sepolia |
-| **Built-in services** | `cricket-live` ($0.02), `weather-live` ($0.01), `news-live` ($0.02) and `finance-quote` ($0.01), resold by PayGate itself. Each feed is listed only when its data key is set |

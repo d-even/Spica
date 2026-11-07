@@ -6,7 +6,6 @@ import type { Confirmation, PaymentAdapter } from './types';
 
 const MIRROR_NODES = {
   'hedera-testnet': 'https://testnet.mirrornode.hedera.com',
-  'hedera-mainnet': 'https://mainnet-public.mirrornode.hedera.com',
 } as const;
 
 const MAX_TIMEOUT_SECONDS = 180;
@@ -26,7 +25,7 @@ export class HederaPaymentAdapter implements PaymentAdapter {
   readonly network;
   private feePayer?: string;
 
-  constructor(readonly id: 'hedera-testnet' | 'hedera-mainnet') {
+  constructor(readonly id: 'hedera-testnet') {
     this.info = NETWORKS[id];
     this.network = this.info.caip2;
   }

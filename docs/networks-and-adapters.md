@@ -6,20 +6,18 @@ Each payment network is handled by one adapter class. The rest of PayGate only t
 
 Defined in `src/lib/networks.ts`. The file contains only public facts, so it is safe in client bundles.
 
-| ID | Label | CAIP-2 | USDC | Rail | Mainnet |
-| --- | --- | --- | --- | --- | --- |
-| `arc-testnet` | Arc Testnet | `eip155:5042002` | `0x3600000000000000000000000000000000000000` | Circle Gateway | No |
-| `arc-mainnet` | Arc | `eip155:5042` | `0x3600000000000000000000000000000000000000` | Circle Gateway | Yes |
-| `hedera-testnet` | Hedera testnet | `hedera:testnet` | `0.0.429274` | x402 facilitator | No |
-| `hedera-mainnet` | Hedera mainnet | `hedera:mainnet` | `0.0.456858` | x402 facilitator | Yes |
-| `demo` | Demo (simulated) | `paygate:demo` | `DEMO-USDC` | Simulated | No |
+| ID | Label | CAIP-2 | USDC | Rail |
+| --- | --- | --- | --- | --- |
+| `arc-testnet` | Arc Testnet | `eip155:5042002` | `0x3600000000000000000000000000000000000000` | Circle Gateway |
+| `hedera-testnet` | Hedera testnet | `hedera:testnet` | `0.0.429274` | x402 facilitator |
+| `demo` | Demo (simulated) | `paygate:demo` | `DEMO-USDC` | Simulated |
 
 ### Which networks are active
 
 `activeNetworks()` in `src/server/env.ts`:
 
 - **Demo mode**: only `demo`.
-- **Live mode**: `arc-testnet` if `AGENT_PRIVATE_KEY` is set, and `hedera-testnet` if `HEDERA_AGENT_ACCOUNT_ID`, `HEDERA_AGENT_PRIVATE_KEY` and `HEDERA_FACILITATOR_URL` are all set. Each mainnet is added only when `PAYGATE_ENABLE_MAINNET=true` as well.
+- **Live mode**: `arc-testnet` if `AGENT_PRIVATE_KEY` is set, and `hedera-testnet` if `HEDERA_AGENT_ACCOUNT_ID`, `HEDERA_AGENT_PRIVATE_KEY` and 
 
 A network must be active on the server **and** in the person's `allowedNetworks` to be paid. Mainnet also passes the firewall's own `mainnet_disabled` check, so a policy cannot turn it on.
 
@@ -96,6 +94,6 @@ The scheme is called directly instead of through `x402Client`, because that clie
 2. Write a `PaymentAdapter` in `src/server/payments/`, including a `confirm` that checks the settlement against an independent source.
 3. Register it in `registry.ts`.
 4. Add a signing scheme in `src/server/signer/index.ts`, with any keys read only in `keys.ts`.
-5. Add the network to `liveNetworks()` in `env.ts`, gated on its keys and, for mainnet, on `mainnetEnabled()`.
+5. Add the network to `liveNetworks()` in `env.ts`, gated on its keys.
 6. Decide where built-in services get paid on it in `builtinPayTo` (`discovery/catalog.ts`), and which provider field holds the payout address in `registeredToCatalog`.
 7. Add tests, and a read-only check in `scripts/live-check.mts`.

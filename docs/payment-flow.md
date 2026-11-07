@@ -116,4 +116,4 @@ PayGate also sells, at `GET /api/x402/:serviceId` (`src/app/api/x402/[serviceId]
 3. Wrap delivery in `withPayment` from `paygate-x402`, with one offer per active network, a replay guard backed by `store.claimProof`, and an `onEvent` hook that records `sale` and `sale_failed` activity for the provider.
 4. Delivery runs **before** settlement. For built-ins, it loads the cricket feed and returns `503` if real data is unavailable in live mode. For registered services, it fetches the provider's endpoint through `safeFetch`. A failed delivery means no settlement and no charge.
 
-See [`paygate-x402/README.md`](../paygate-x402/README.md) for the middleware's own steps.
+See [`spica/README.md`](../spica/README.md) for the middleware's own steps.

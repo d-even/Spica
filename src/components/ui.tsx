@@ -1,12 +1,13 @@
 import type { ComponentProps, ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, CircleDashed, Clock, FlaskConical, XCircle } from 'lucide-react';
+import { LoadingAnimation } from './spica/LoadingAnimation';
 
 export function Card({ title, action, className = '', children }: { title?: string; action?: ReactNode; className?: string; children: ReactNode }) {
   return (
-    <section className={`rounded-2xl border border-line bg-surface p-5 shadow-card ${className}`}>
+    <section className={`rounded-2xl border-2 border-ink bg-surface p-5 shadow-card ${className}`}>
       {(title || action) && (
         <div className="mb-4 flex items-center justify-between gap-3">
-          {title && <h2 className="text-sm font-semibold">{title}</h2>}
+          {title && <h2 className="text-base font-bold">{title}</h2>}
           {action}
         </div>
       )}
@@ -18,7 +19,7 @@ export function Card({ title, action, className = '', children }: { title?: stri
 export function PageHeader({ title, description }: { title: string; description?: string }) {
   return (
     <header className="mb-6">
-      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+      <h1 className="font-display text-4xl uppercase leading-tight tracking-wide">{title}</h1>
       {description && <p className="mt-1 max-w-2xl text-sm text-ink-2">{description}</p>}
     </header>
   );
@@ -26,19 +27,19 @@ export function PageHeader({ title, description }: { title: string; description?
 
 export function Button({ variant = 'primary', className = '', ...props }: ComponentProps<'button'> & { variant?: 'primary' | 'ghost' | 'danger' }) {
   const styles = {
-    primary: 'bg-accent text-accent-ink hover:opacity-90',
-    ghost: 'border border-line bg-surface text-ink hover:bg-surface-2',
-    danger: 'border border-line bg-surface text-bad hover:bg-bad-bg',
+    primary: 'border-2 border-ink bg-[#ffe34d] text-[#111] shadow-[2px_2px_0_var(--ink)] hover:-translate-x-px hover:-translate-y-px hover:shadow-[3px_3px_0_var(--ink)]',
+    ghost: 'border-2 border-ink bg-surface text-ink hover:bg-surface-2',
+    danger: 'border-2 border-bad bg-surface text-bad hover:bg-bad-bg',
   }[variant];
   return (
     <button
-      className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${styles} ${className}`}
+      className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${styles} ${className}`}
       {...props}
     />
   );
 }
 
-const fieldClass = 'min-h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm placeholder:text-ink-3';
+const fieldClass = 'min-h-10 w-full rounded-xl border-2 border-ink bg-surface px-3 text-sm placeholder:text-ink-3';
 
 export const Input = (props: ComponentProps<'input'>) => <input className={fieldClass} {...props} />;
 export const Textarea = (props: ComponentProps<'textarea'>) => <textarea className={`${fieldClass} py-2`} {...props} />;
@@ -117,5 +118,5 @@ export function ErrorNote({ children }: { children: ReactNode }) {
 }
 
 export function Loading() {
-  return <p className="py-10 text-center text-sm text-ink-3">Loading…</p>;
+  return <LoadingAnimation />;
 }

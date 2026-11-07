@@ -1,5 +1,4 @@
-import { NETWORKS } from '@/lib/networks';
-import { auditProof, settlementProof, type PaymentProof } from '@/lib/proof';
+import { auditProof, settlementProof, showsAudit, type PaymentProof } from '@/lib/proof';
 import { apiError, authed, toJson } from '@/server/http/api';
 import { refreshTransaction } from '@/server/settlement';
 import { getStore } from '@/server/store';
@@ -17,13 +16,14 @@ export const GET = authed(async (user, _request, { params }: { params: Promise<{
   // Read again: a refresh that just settled the payment has published a new audit message.
   const fresh = current.status === transaction.status ? events : (await store.listActivity(user.id, 50)).filter((event) => event.transactionId === id);
   const published = fresh.filter((event) => event.eventType === 'hcs_published');
+  const withAudit = showsAudit(current.network);
   const proof: PaymentProof = {
     settlement: settlementProof(current),
-    audit: published.flatMap((event) => {
+    audit: (withAudit ? published : []).flatMap((event) => {
       const { status, sequence, transactionId } = event.eventData as Record<string, string>;
-      return transactionId ? [auditProof(status ?? 'recorded', sequence, transactionId, NETWORKS[current.network].mainnet)] : [];
+      return transactionId ? [auditProof(status ?? 'recorded', sequence, transactionId)] : [];
     }),
-    auditPending: current.status === 'verified' && published.length > 0 && !published.some((event) => event.eventData.status === 'verified'),
+    auditPending: withAudit && current.status === 'verified' && published.length > 0 && !published.some((event) => event.eventData.status === 'verified'),
   };
   return toJson({ ...current, usageCode, proof });
 });

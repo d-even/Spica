@@ -26,7 +26,7 @@ export function isPrivateAddress(address: string) {
 
 /**
  * Catalog URLs are third-party input, so they must not reach internal hosts.
- * PayGate's own origin is the one exception, because built-in services live there.
+ * SPICA's own origin is the one exception, because built-in services live there.
  */
 export async function assertPublicUrl(raw: string): Promise<URL> {
   const url = new URL(raw);

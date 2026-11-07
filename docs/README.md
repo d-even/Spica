@@ -1,6 +1,6 @@
 # PayGate documentation
 
-These docs explain how PayGate works inside. To run it, start with the [project README](../README.md). To plug PayGate into your own project, see [Integrating PayGate](../README.md#integrating-paygate).
+These docs explain how PayGate works inside. To run it, start with the [project README](../README.md). To plug PayGate into your own project, see [Integrating PayGate](../README.md#integrating-spica).
 
 ## Reading order
 
@@ -33,7 +33,7 @@ Then read whichever area you are working on:
 | `src/server/` | All server-side logic. Nothing here reaches the browser |
 | `src/lib/` | Code shared with the browser: money, network facts, PayGate ID lookups |
 | `src/components/` | React UI components |
-| `paygate-x402/` | The reusable x402 seller middleware |
+| `spica/` | The `paygate-x402` package: reusable x402 seller middleware |
 | `supabase/migrations/` | The database schema for live mode |
 | `scripts/` | Wallet tools, end-to-end, live and mutation checks |
 | `tests/` | Vitest suites |

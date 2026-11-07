@@ -17,7 +17,7 @@ const injected = (): Eip1193Provider | undefined =>
 const short = (address: string) => `${address.slice(0, 6)}…${address.slice(-4)}`;
 
 /**
- * Connects a browser wallet to read its address, nothing more. PayGate only
+ * Connects a browser wallet to read its address, nothing more. SPICA only
  * needs an address to receive payments, so this never asks the wallet to sign
  * or send anything.
  */

@@ -17,7 +17,7 @@ export type WalletChain = 'arc-testnet';
 
 export interface SessionUser {
   id: string;
-  /** The signed-in wallet. Null for the shared demo user. */
+  /** The signed-in wallet. Null for the shared demo user and older email sessions. */
   address: string | null;
   chain: WalletChain | null;
   demo: boolean;
@@ -49,7 +49,7 @@ const cookieOptions = (maxAge: number) => ({
  */
 export async function currentUser(): Promise<SessionUser | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  let session: { sub: string; addr: string; chain: WalletChain } | null = null;
+  let session: { sub: string; addr: string | null; chain: WalletChain | null } | null = null;
   try {
     session = unseal('session', token);
   } catch (error) {

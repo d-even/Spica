@@ -10,6 +10,22 @@ export const toJson = (value: unknown) =>
 
 export const apiError = (message: string, status: number) => NextResponse.json({ error: message }, { status });
 
+/** For public, read-only routes: rate limits per client and maps failures to safe responses. */
+export function open<Args extends unknown[]>(handler: (request: Request, ...args: Args) => Promise<Response>) {
+  return async (request: Request, ...args: Args): Promise<Response> => {
+    await connection();
+    try {
+      const client = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'local';
+      if (!allowRequest(`open:${client}:${new URL(request.url).pathname}`, 120, 60_000)) return apiError('Too many requests. Try again shortly.', 429);
+      return await handler(request, ...args);
+    } catch (error) {
+      if (error instanceof ZodError) return apiError(error.issues[0]?.message ?? 'Invalid request.', 400);
+      console.error('API error:', error);
+      return apiError('Something went wrong on our side.', 500);
+    }
+  };
+}
+
 /** Authenticates, rate limits per user, and maps failures to safe responses. */
 export function authed<Args extends unknown[]>(
   handler: (user: SessionUser, request: Request, ...args: Args) => Promise<Response>,
