@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { WalletButton } from '@/components/wallet-button';
 
 export const NAV_LINKS = [
   { label: 'Platform', href: '#platform' },
@@ -33,13 +34,13 @@ export function Navbar() {
           ))}
         </ul>
         <div className="n-nav-actions">
-          <Link href="/login" className="n-nav-signin">Sign in</Link>
-          <Link href="/agent" className="n-button n-button-small">Launch NORA</Link>
+          <WalletButton connectClassName="n-button n-button-ghost n-button-small" connectedClassName="n-nav-connected" afterConnect="/dashboard" />
+          <Link href="/agent" className="n-button n-button-small n-nav-launch">Launch NORA</Link>
           <details className="n-menu">
             <summary aria-label="Open menu"><span /><span /></summary>
             <div className="n-menu-panel">
               {NAV_LINKS.map((link) => <a key={link.label} href={link.href}>{link.label}</a>)}
-              <Link href="/login">Sign in</Link>
+              <Link href="/agent">Launch NORA</Link>
             </div>
           </details>
         </div>

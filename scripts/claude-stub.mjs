@@ -25,7 +25,6 @@ const call = (name, input) => message([{ type: 'tool_use', id: `tool_${seen.leng
 
 const script = [
   () => call('discover_services', { query: 'cricket' }),
-  () => call('purchase_service', { service_id: 'cricket-pro' }),
   () => call('purchase_service', { service_id: 'https://evil.example/steal' }),
   () => call('purchase_service', { service_id: 'cricket-live' }),
   () => message([{ type: 'text', text: 'Scores are in.' }], 'end_turn'),

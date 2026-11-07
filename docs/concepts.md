@@ -91,4 +91,4 @@ Demo mode still runs the real 402 handshake, the real firewall, real reservation
 | **Provider** | Someone selling an API through PayGate |
 | **Provider key** | A stable ID for a provider, used in allowlists and blocklists, for example `paygate:builtin` or `catalog:acme` |
 | **PayGate ID** | A `name.paygate.eth` label from PayGate's registry contract on Sepolia |
-| **Built-in services** | `cricket-live` ($0.02) and `cricket-pro` ($2.00), sold by PayGate itself for the demo journey |
+| **Built-in services** | `cricket-live` ($0.02), `weather-live` ($0.01), `news-live` ($0.02) and `finance-quote` ($0.01), resold by PayGate itself. Each feed is listed only when its data key is set |

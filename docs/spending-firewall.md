@@ -58,7 +58,7 @@ With the default policy and nothing spent yet:
 | --- | --- | --- |
 | $0.02 from `cricket-live` | allow | Under every limit and the threshold |
 | $0.15 with threshold lowered to $0.10 | needs approval | Above the threshold, under the hard limits |
-| $2.00 from `cricket-pro` | deny, `per_request_limit` | Above $0.50. Approval cannot override it |
+| $2.00 from any service | deny, `per_request_limit` | Above $0.50. Approval cannot override it |
 | $0.02 when the message said "spend at most 1 cent" | deny, `task_budget` | Above the task budget |
 | Anything from a blocked provider | deny, `provider_blocked` | Blocklist is a hard limit |
 

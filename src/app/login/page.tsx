@@ -1,13 +1,11 @@
 'use client';
 
 import { Wallet } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Badge, Button, Card, ErrorNote } from '@/components/ui';
-import { signInWithArc, walletErrorMessage } from '@/components/wallet';
+import { openFresh, signInWithArc, walletErrorMessage } from '@/components/wallet';
 
 export default function Login() {
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -16,7 +14,7 @@ export default function Login() {
     setError(undefined);
     try {
       await signInWithArc();
-      router.push('/dashboard');
+      openFresh('/dashboard');
     } catch (cause) {
       setError(walletErrorMessage(cause));
     } finally {

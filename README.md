@@ -165,6 +165,7 @@ All routes except `/api/x402/*`, `/api/v1/*` and `/api/auth/*` need a signed-in 
 | `GET /api/x402/:serviceId` | A paid resource, using x402 v2 |
 | `GET /api/v1/:serviceId` | The developer API. Send the key from a purchase as `Authorization: Bearer <key>`. Each call pays through the firewall, and query parameters reach the provider |
 | `POST /api/auth/nonce`, `/wallet`, `/logout` | Wallet sign-in (Sign-In with Ethereum on Arc Testnet) |
+| `GET /api/auth/me` | The signed-in wallet, or null |
 
 ## Integrating PayGate
 
@@ -323,7 +324,7 @@ Read a receipt with `GET /api/transactions/:id`. The full route list is under [A
 
 ### 4. Pay PayGate services from any x402 client
 
-`GET /api/x402/:serviceId` is a standard x402 v2 resource. The built-in services are `cricket-live` and `cricket-pro`, and registered services use their own IDs.
+`GET /api/x402/:serviceId` is a standard x402 v2 resource. The built-in services are `cricket-live`, `weather-live`, `news-live` and `finance-quote` (each feed is listed only when its data key is set), and registered services use their own IDs.
 
 1. Call it with no payment. You get `402` with a `PAYMENT-REQUIRED` header listing the accepted networks, asset, amount and `payTo`.
 2. Retry with a signed proof in `PAYMENT-SIGNATURE`. `X-PAYMENT` is also accepted.

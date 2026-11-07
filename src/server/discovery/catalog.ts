@@ -10,8 +10,7 @@ import type { CatalogService } from './types';
 
 /**
  * Services PayGate sells itself. The Circle catalog has no cricket API, so the
- * end-to-end journey runs against these real x402 endpoints. `cricket-pro` is
- * the expensive option the firewall is expected to refuse.
+ * end-to-end journey runs against these real x402 endpoints.
  */
 const BUILTIN: { id: string; name: string; description: string; priceMicros: string; input?: Record<string, string> }[] = [
   {
@@ -40,12 +39,6 @@ const BUILTIN: { id: string; name: string; description: string; priceMicros: str
     name: 'Cricket Live Scores',
     description: 'Current cricket matches with scores and match status.',
     priceMicros: '20000',
-  },
-  {
-    id: 'cricket-pro',
-    name: 'Cricket Pro Feed',
-    description: 'The same cricket feed at a premium price.',
-    priceMicros: '2000000',
   },
 ];
 

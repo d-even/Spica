@@ -16,7 +16,7 @@ All sources are turned into one shape, `CatalogService` (`src/server/discovery/t
 
 | Source | `source` | Where | IDs |
 | --- | --- | --- | --- |
-| Built-in services | `builtin` | `discovery/catalog.ts` | `cricket-live`, `cricket-pro` |
+| Built-in services | `builtin` | `discovery/catalog.ts` | `cricket-live`, `weather-live`, `news-live`, `finance-quote` |
 | Services registered on PayGate | `paygate` | The store | Database UUIDs |
 | Circle Agent Marketplace | `circle` | `discovery/circle.ts` | `cat_` + first 16 hex characters of SHA-256 of the resource URL |
 
