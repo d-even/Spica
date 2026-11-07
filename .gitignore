@@ -9,7 +9,7 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
-
+packages/agent-sdk/node_modules
 
 # testing
 /coverage
